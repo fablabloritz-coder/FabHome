@@ -390,6 +390,83 @@
         });
     }
 
+    /* -- Group Widget -- */
+    var groupWidgetModal = null;
+    
+    function openGroupWidgetModal(widgetId, groupId) {
+        if (!groupWidgetModal) {
+            var gwm = qs('#groupWidgetModal');
+            if (gwm && typeof bootstrap !== 'undefined') groupWidgetModal = new bootstrap.Modal(gwm);
+        }
+        if (!groupWidgetModal) return;
+        
+        var form = qs('#groupWidgetForm');
+        var title = qs('#groupWidgetModalTitle');
+        var typeSelect = qs('#groupWidgetType');
+        
+        if (widgetId) {
+            // TODO: Mode édition - charger les données du widget
+            title.textContent = 'Modifier le widget';
+            form.dataset.editId = widgetId;
+        } else {
+            title.textContent = 'Ajouter un widget';
+            delete form.dataset.editId;
+            form.reset();
+            form.elements.group_id.value = groupId;
+        }
+        groupWidgetModal.show();
+    }
+    
+    // Gérer l'affichage des configs selon le type
+    var typeSelect = qs('#groupWidgetType');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', function() {
+            var type = this.value;
+            qs('#widgetConfigNote').style.display = type === 'note' ? '' : 'none';
+            qs('#widgetConfigWeather').style.display = type === 'weather' ? '' : 'none';
+        });
+    }
+    
+    var groupWidgetForm = qs('#groupWidgetForm');
+    if (groupWidgetForm) {
+        // Ajouter le champ group_id caché si inexistant
+        if (!groupWidgetForm.elements.group_id) {
+            var hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'group_id';
+            groupWidgetForm.appendChild(hiddenInput);
+        }
+        
+        groupWidgetForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var config = {};
+            var type = f.elements.type.value;
+            
+            if (type === 'note') {
+                config.text = f.elements.note_text.value;
+            } else if (type === 'weather') {
+                config.city = f.elements.weather_city.value;
+                config.latitude = parseFloat(f.elements.weather_lat.value) || 48.69;
+                config.longitude = parseFloat(f.elements.weather_lon.value) || 6.18;
+            }
+            
+            var body = {
+                group_id: parseInt(f.elements.group_id.value),
+                type: type,
+                config: config,
+                icon_size: f.elements.icon_size.value,
+                text_size: f.elements.text_size.value
+            };
+            
+            var eid = f.dataset.editId;
+            var p = eid ? api('PUT', '/api/group-widgets/' + eid, body)
+                        : api('POST', '/api/group-widgets', body);
+            p.then(function () { location.href = editUrl(); })
+             .catch(function (err) { alert(err.message); });
+        });
+    }
+
     /* -- Reglages -- */
     var settingsForm = qs('#settingsForm');
     if (settingsForm) {
@@ -869,6 +946,19 @@
             case 'delete-link':
                 if (confirm('Supprimer le lien \u00AB ' + (btn.dataset.name || '') + ' \u00BB ?')) {
                     api('DELETE', '/api/links/' + id)
+                        .then(function () { location.href = editUrl(); })
+                        .catch(function (err) { alert(err.message); });
+                }
+                break;
+            case 'new-group-widget':
+                openGroupWidgetModal(null, parseInt(btn.dataset.groupId));
+                break;
+            case 'edit-group-widget':
+                openGroupWidgetModal(id);
+                break;
+            case 'delete-group-widget':
+                if (confirm('Supprimer ce widget ?')) {
+                    api('DELETE', '/api/group-widgets/' + id)
                         .then(function () { location.href = editUrl(); })
                         .catch(function (err) { alert(err.message); });
                 }

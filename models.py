@@ -79,6 +79,16 @@ def init_db():
             UNIQUE(profile_id, type),
             FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS group_widgets (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id    INTEGER NOT NULL,
+            type        TEXT    NOT NULL,
+            config      TEXT    NOT NULL DEFAULT '{}',
+            icon_size   TEXT    NOT NULL DEFAULT 'medium',
+            text_size   TEXT    NOT NULL DEFAULT 'medium',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (group_id) REFERENCES groups_(id) ON DELETE CASCADE
+        );
         CREATE TABLE IF NOT EXISTS services (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             name       TEXT    NOT NULL,
@@ -90,6 +100,7 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
+        CREATE INDEX IF NOT EXISTS idx_group_widgets_group ON group_widgets(group_id);
     ''')
 
     # ── Migrations ────────────────────────────────────────
@@ -359,12 +370,28 @@ def get_groups(page_id=None):
             'SELECT * FROM groups_ ORDER BY grid_row, grid_col, id').fetchall()]
     links = [dict(r) for r in conn.execute(
         'SELECT * FROM links ORDER BY sort_order, id').fetchall()]
+    
+    # Charger les group_widgets
+    group_widgets_rows = [dict(r) for r in conn.execute(
+        'SELECT * FROM group_widgets ORDER BY sort_order, id').fetchall()]
+    
     conn.close()
+    
+    # Organiser les liens par groupe
     by_group = {}
     for lnk in links:
         by_group.setdefault(lnk['group_id'], []).append(lnk)
+    
+    # Organiser les widgets par groupe
+    widgets_by_group = {}
+    for gw in group_widgets_rows:
+        gw['config'] = json.loads(gw['config'])
+        widgets_by_group.setdefault(gw['group_id'], []).append(gw)
+    
     for g in groups:
         g['links'] = by_group.get(g['id'], [])
+        g['group_widgets'] = widgets_by_group.get(g['id'], [])
+    
     return groups
 
 
@@ -527,6 +554,67 @@ def update_service(sid, name, stype, url, api_key='', config=None, enabled=1):
 def delete_service(sid):
     conn = get_db()
     conn.execute('DELETE FROM services WHERE id=?', (sid,))
+    conn.commit()
+    conn.close()
+
+
+# ── Group Widgets (widgets dans les groupes) ──────────────
+
+def get_group_widgets(group_id):
+    """Récupère tous les widgets d'un groupe"""
+    conn = get_db()
+    rows = [dict(r) for r in conn.execute(
+        'SELECT * FROM group_widgets WHERE group_id=? ORDER BY sort_order, id',
+        (group_id,)).fetchall()]
+    conn.close()
+    for r in rows:
+        r['config'] = json.loads(r['config'])
+    return rows
+
+
+def create_group_widget(group_id, wtype, config=None, icon_size='medium', text_size='medium'):
+    """Ajoute un widget à un groupe"""
+    conn = get_db()
+    mx = conn.execute('SELECT COALESCE(MAX(sort_order),0) FROM group_widgets WHERE group_id=?',
+                      (group_id,)).fetchone()[0]
+    cur = conn.execute(
+        'INSERT INTO group_widgets (group_id, type, config, icon_size, text_size, sort_order) '
+        'VALUES (?,?,?,?,?,?)',
+        (group_id, wtype, json.dumps(config or {}), icon_size, text_size, mx + 1))
+    wid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return wid
+
+
+def update_group_widget(wid, wtype=None, config=None, icon_size=None, text_size=None):
+    """Met à jour un widget de groupe"""
+    conn = get_db()
+    fields = []
+    params = []
+    if wtype is not None:
+        fields.append('type=?')
+        params.append(wtype)
+    if config is not None:
+        fields.append('config=?')
+        params.append(json.dumps(config))
+    if icon_size is not None:
+        fields.append('icon_size=?')
+        params.append(icon_size)
+    if text_size is not None:
+        fields.append('text_size=?')
+        params.append(text_size)
+    if fields:
+        params.append(wid)
+        conn.execute(f"UPDATE group_widgets SET {','.join(fields)} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+
+
+def delete_group_widget(wid):
+    """Supprime un widget de groupe"""
+    conn = get_db()
+    conn.execute('DELETE FROM group_widgets WHERE id=?', (wid,))
     conn.commit()
     conn.close()
 

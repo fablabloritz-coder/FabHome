@@ -113,15 +113,19 @@ def api_get_profiles():
 
 @app.route('/api/profiles', methods=['POST'])
 def api_create_profile():
-    data = request.get_json() or {}
-    name = (data.get('name') or '').strip()
-    if not name:
-        return jsonify(error='Nom requis'), 400
-    profile_id = models.create_profile(
-        name[:50],
-        (data.get('icon') or '👤')[:10],
-        (data.get('color') or '#6c757d')[:20])
-    return jsonify(id=profile_id), 201
+    try:
+        data = request.get_json() or {}
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify(error='Nom requis'), 400
+        profile_id = models.create_profile(
+            name[:50],
+            (data.get('icon') or '👤')[:10],
+            (data.get('color') or '#6c757d')[:20])
+        return jsonify(id=profile_id), 201
+    except Exception as e:
+        logger.error(f"Erreur création profil: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
 
 
 @app.route('/api/profiles/<int:profile_id>', methods=['PUT'])
@@ -162,17 +166,21 @@ def api_switch_profile():
 
 @app.route('/api/settings', methods=['PUT'])
 def api_update_settings():
-    data = request.get_json()
-    if not data:
-        return jsonify(error='Données manquantes'), 400
-    profile_id = get_current_profile_id()
-    allowed = {'title', 'theme', 'background_url', 'greeting_name',
-               'search_provider', 'grid_cols', 'grid_rows',
-               'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls'}
-    for k, v in data.items():
-        if k in allowed:
-            models.update_setting(k, str(v)[:500], profile_id)
-    return jsonify(ok=True)
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify(error='Données manquantes'), 400
+        profile_id = get_current_profile_id()
+        allowed = {'title', 'theme', 'background_url', 'greeting_name',
+                   'search_provider', 'grid_cols', 'grid_rows',
+                   'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls'}
+        for k, v in data.items():
+            if k in allowed:
+                models.update_setting(k, str(v)[:500], profile_id)
+        return jsonify(ok=True)
+    except Exception as e:
+        logger.error(f"Erreur mise à jour réglages: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
 
 
 # ── API : Groupes ─────────────────────────────────────────
@@ -291,6 +299,62 @@ def api_reorder_links():
     return jsonify(ok=True)
 
 
+# ── API : Group Widgets ───────────────────────────────────
+
+@app.route('/api/group-widgets', methods=['POST'])
+def api_create_group_widget():
+    """Créer un widget dans un groupe"""
+    try:
+        data = request.get_json() or {}
+        group_id = data.get('group_id')
+        wtype = (data.get('type') or '').strip()
+        if not group_id or not wtype:
+            return jsonify(error='group_id et type requis'), 400
+        
+        allowed_types = {'clock', 'weather', 'calendar', 'camera', 'service', 'health', 'note'}
+        if wtype not in allowed_types:
+            return jsonify(error=f'Type invalide. Types autorisés: {", ".join(allowed_types)}'), 400
+        
+        wid = models.create_group_widget(
+            group_id=int(group_id),
+            wtype=wtype,
+            config=data.get('config', {}),
+            icon_size=data.get('icon_size', 'medium'),
+            text_size=data.get('text_size', 'medium'))
+        return jsonify(id=wid), 201
+    except Exception as e:
+        logger.error(f"Erreur création widget groupe: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
+
+
+@app.route('/api/group-widgets/<int:wid>', methods=['PUT'])
+def api_update_group_widget(wid):
+    """Mettre à jour un widget de groupe"""
+    try:
+        data = request.get_json() or {}
+        models.update_group_widget(
+            wid,
+            wtype=data.get('type'),
+            config=data.get('config'),
+            icon_size=data.get('icon_size'),
+            text_size=data.get('text_size'))
+        return jsonify(ok=True)
+    except Exception as e:
+        logger.error(f"Erreur mise à jour widget groupe: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
+
+
+@app.route('/api/group-widgets/<int:wid>', methods=['DELETE'])
+def api_delete_group_widget(wid):
+    """Supprimer un widget de groupe"""
+    try:
+        models.delete_group_widget(wid)
+        return jsonify(ok=True)
+    except Exception as e:
+        logger.error(f"Erreur suppression widget groupe: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
+
+
 # ── API : Widgets ─────────────────────────────────────────
 
 @app.route('/api/widgets', methods=['PUT'])
@@ -354,16 +418,20 @@ def api_reorder_pages():
 
 @app.route('/api/services', methods=['POST'])
 def api_create_service():
-    data = request.get_json() or {}
-    name = (data.get('name') or '').strip()
-    if not name:
-        return jsonify(error='Nom requis'), 400
-    stype = (data.get('type') or 'generic').strip()[:50]
-    url = (data.get('url') or '').strip()[:2000]
-    api_key = (data.get('api_key') or '')[:500]
-    config = data.get('config', {})
-    sid = models.create_service(name[:100], stype, url, api_key, config)
-    return jsonify(id=sid), 201
+    try:
+        data = request.get_json() or {}
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify(error='Nom requis'), 400
+        stype = (data.get('type') or 'generic').strip()[:50]
+        url = (data.get('url') or '').strip()[:2000]
+        api_key = (data.get('api_key') or '')[:500]
+        config = data.get('config', {})
+        sid = models.create_service(name[:100], stype, url, api_key, config)
+        return jsonify(id=sid), 201
+    except Exception as e:
+        logger.error(f"Erreur création service: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
 
 
 @app.route('/api/services/<int:sid>', methods=['PUT'])

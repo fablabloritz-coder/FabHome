@@ -215,11 +215,64 @@
                         </div>
                     </div>
                     {% endfor %}
+                    
+                    {% for gwidget in group.group_widgets %}
+                    <div class="widget-in-group widget-{{ gwidget.type }} size-icon-{{ gwidget.icon_size }} size-text-{{ gwidget.text_size }}"
+                         data-widget-id="{{ gwidget.id }}" data-widget-type="{{ gwidget.type }}">
+                        {% if gwidget.type == 'clock' %}
+                            <div class="group-widget-clock">
+                                <div class="gw-clock-time">--:--</div>
+                                <div class="gw-clock-date"></div>
+                            </div>
+                        {% elif gwidget.type == 'weather' %}
+                            <div class="group-widget-weather">
+                                <i class="bi bi-cloud"></i>
+                                <span class="gw-temp">--°C</span>
+                                <small>{{ gwidget.config.get('city', '') }}</small>
+                            </div>
+                        {% elif gwidget.type == 'note' %}
+                            <div class="group-widget-note">
+                                <div class="gw-note-content">{{ gwidget.config.get('text', 'Note vide') }}</div>
+                            </div>
+                        {% elif gwidget.type == 'health' %}
+                            <div class="group-widget-health">
+                                <div class="gw-health-item">
+                                    <i class="bi bi-cpu"></i>
+                                    <span class="gw-health-value">--%</span>
+                                </div>
+                                <div class="gw-health-item">
+                                    <i class="bi bi-memory"></i>
+                                    <span class="gw-health-value">--%</span>
+                                </div>
+                                <div class="gw-health-item">
+                                    <i class="bi bi-device-hdd"></i>
+                                    <span class="gw-health-value">--%</span>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="group-widget-generic">
+                                <i class="bi bi-puzzle"></i>
+                                <span>{{ gwidget.type }}</span>
+                            </div>
+                        {% endif %}
+                        <div class="edit-overlay widget-overlay">
+                            <button class="ov-btn ov-sm" title="Modifier" data-action="edit-group-widget"
+                                    data-id="{{ gwidget.id }}"><i class="bi bi-pencil"></i></button>
+                            <button class="ov-btn ov-sm ov-danger" title="Supprimer" data-action="delete-group-widget"
+                                    data-id="{{ gwidget.id }}"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
 
-                <button class="btn-add-link edit-only" data-action="new-link" data-group-id="{{ group.id }}">
-                    <i class="bi bi-plus"></i> Ajouter un lien
-                </button>
+                <div class="edit-only" style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="btn-add-link" data-action="new-link" data-group-id="{{ group.id }}" style="flex: 1;">
+                        <i class="bi bi-plus"></i> Ajouter un lien
+                    </button>
+                    <button class="btn-add-widget" data-action="new-group-widget" data-group-id="{{ group.id }}" style="flex: 1;">
+                        <i class="bi bi-puzzle"></i> Ajouter un widget
+                    </button>
+                </div>
             </div>
             {% endfor %}
 
@@ -461,6 +514,79 @@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" name="check_status" id="chkStatus">
                         <label class="form-check-label" for="chkStatus">Surveiller le statut</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL GROUP WIDGET -->
+<div class="modal fade" id="groupWidgetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="groupWidgetForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="groupWidgetModalTitle">Ajouter un widget</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Type de widget</label>
+                        <select class="form-select" name="type" id="groupWidgetType" required>
+                            <option value="">-- Choisir --</option>
+                            <option value="clock">⏰ Horloge</option>
+                            <option value="weather">🌤️ Météo</option>
+                            <option value="health">💻 Santé serveur</option>
+                            <option value="note">📝 Note</option>
+                            <option value="calendar">📅 Calendrier</option>
+                            <option value="camera">📷 Caméra</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="widgetConfigNote" style="display: none;">
+                        <label class="form-label">Texte de la note</label>
+                        <textarea class="form-control" name="note_text" rows="3" maxlength="500"></textarea>
+                    </div>
+                    
+                    <div class="mb-3" id="widgetConfigWeather" style="display: none;">
+                        <label class="form-label">Ville</label>
+                        <input type="text" class="form-control" name="weather_city" maxlength="100">
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <label class="form-label">Latitude</label>
+                                <input type="number" step="0.01" class="form-control" name="weather_lat">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Longitude</label>
+                                <input type="number" step="0.01" class="form-control" name="weather_lon">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label">Taille des icônes</label>
+                            <select class="form-select" name="icon_size">
+                                <option value="small">Petit</option>
+                                <option value="medium" selected>Moyen</option>
+                                <option value="large">Grand</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Taille du texte</label>
+                            <select class="form-select" name="text_size">
+                                <option value="small">Petit</option>
+                                <option value="medium" selected>Moyen</option>
+                                <option value="large">Grand</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

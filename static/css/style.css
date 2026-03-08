@@ -116,7 +116,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
 .profile-selector {
     position: fixed;
     top: 15px;
-    right: 20px;
+    left: 20px;
     z-index: 1001;
 }
 
@@ -909,6 +909,52 @@ body.edit-mode .group-card {
     justify-content: center; align-items: center; gap: 0.3rem;
 }
 .btn-add-link:hover { border-color: var(--fh-accent); color: var(--fh-accent); }
+.btn-add-widget {
+    width: 100%; margin-top: 0.4rem;
+    padding: 0.35rem; border-radius: 8px;
+    border: 1px dashed var(--fh-card-border);
+    background: transparent; color: var(--fh-text-muted);
+    cursor: pointer; font-size: 0.78rem;
+    transition: all 0.15s;
+    justify-content: center; align-items: center; gap: 0.3rem;
+}
+.btn-add-widget:hover { border-color: var(--fh-accent-glow); color: var(--fh-accent); }
+
+/* ══════════════════════════════════════════
+   WIDGETS DANS LES GROUPES
+   ══════════════════════════════════════════ */
+.widget-in-group {
+    position: relative; padding: 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px; margin-bottom: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.2s;
+}
+.widget-in-group:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+}
+.widget-in-group.size-icon-small i { font-size: 1rem; }
+.widget-in-group.size-icon-medium i { font-size: 1.3rem; }
+.widget-in-group.size-icon-large i { font-size: 1.8rem; }
+.widget-in-group.size-text-small { font-size: 0.8rem; }
+.widget-in-group.size-text-medium { font-size: 0.9rem; }
+.widget-in-group.size-text-large { font-size: 1.1rem; }
+.group-widget-clock { text-align: center; }
+.gw-clock-time { font-size: 1.5rem; font-weight: 600; color: var(--fh-text); }
+.gw-clock-date { font-size: 0.75rem; color: var(--fh-text-muted); margin-top: 4px; }
+.group-widget-weather { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.group-widget-weather i { font-size: 1.5rem; color: var(--fh-accent); }
+.gw-temp { font-size: 1.2rem; font-weight: 600; }
+.group-widget-note { color: var(--fh-text); }
+.gw-note-content { font-size: 0.9rem; line-height: 1.4; white-space: pre-wrap; }
+.group-widget-health { display: flex; flex-direction: column; gap: 6px; }
+.gw-health-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.gw-health-item i { font-size: 1rem; color: var(--fh-accent); }
+.gw-health-value { font-weight: 600; color: var(--fh-text); }
+.group-widget-generic { display: flex; align-items: center; gap: 10px; justify-content: center; color: var(--fh-text-muted); }
+.widget-overlay { display: none; position: absolute; top: 4px; right: 4px; gap: 4px; z-index: 10; }
+.edit-mode .widget-in-group:hover .widget-overlay { display: flex; }
 
 /* ── DnD états ────────────────────────── */
 .group-card.dragging { opacity: 0.3; }
