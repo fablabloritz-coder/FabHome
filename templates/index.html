@@ -215,64 +215,66 @@
                         </div>
                     </div>
                     {% endfor %}
-                    
-                    {% for gwidget in group.group_widgets %}
-                    <div class="widget-in-group widget-{{ gwidget.type }} size-icon-{{ gwidget.icon_size }} size-text-{{ gwidget.text_size }}"
-                         data-widget-id="{{ gwidget.id }}" data-widget-type="{{ gwidget.type }}">
-                        {% if gwidget.type == 'clock' %}
-                            <div class="group-widget-clock">
-                                <div class="gw-clock-time">--:--</div>
-                                <div class="gw-clock-date"></div>
-                            </div>
-                        {% elif gwidget.type == 'weather' %}
-                            <div class="group-widget-weather">
-                                <i class="bi bi-cloud"></i>
-                                <span class="gw-temp">--°C</span>
-                                <small>{{ gwidget.config.get('city', '') }}</small>
-                            </div>
-                        {% elif gwidget.type == 'note' %}
-                            <div class="group-widget-note">
-                                <div class="gw-note-content">{{ gwidget.config.get('text', 'Note vide') }}</div>
-                            </div>
-                        {% elif gwidget.type == 'health' %}
-                            <div class="group-widget-health">
-                                <div class="gw-health-item">
-                                    <i class="bi bi-cpu"></i>
-                                    <span class="gw-health-value">--%</span>
-                                </div>
-                                <div class="gw-health-item">
-                                    <i class="bi bi-memory"></i>
-                                    <span class="gw-health-value">--%</span>
-                                </div>
-                                <div class="gw-health-item">
-                                    <i class="bi bi-device-hdd"></i>
-                                    <span class="gw-health-value">--%</span>
-                                </div>
-                            </div>
-                        {% else %}
-                            <div class="group-widget-generic">
-                                <i class="bi bi-puzzle"></i>
-                                <span>{{ gwidget.type }}</span>
-                            </div>
-                        {% endif %}
-                        <div class="edit-overlay widget-overlay">
-                            <button class="ov-btn ov-sm" title="Modifier" data-action="edit-group-widget"
-                                    data-id="{{ gwidget.id }}"><i class="bi bi-pencil"></i></button>
-                            <button class="ov-btn ov-sm ov-danger" title="Supprimer" data-action="delete-group-widget"
-                                    data-id="{{ gwidget.id }}"><i class="bi bi-trash"></i></button>
-                        </div>
-                    </div>
-                    {% endfor %}
                 </div>
 
-                <div class="edit-only" style="display: flex; gap: 8px; margin-top: 8px;">
-                    <button class="btn-add-link" data-action="new-link" data-group-id="{{ group.id }}" style="flex: 1;">
-                        <i class="bi bi-plus"></i> Ajouter un lien
-                    </button>
-                    <button class="btn-add-widget" data-action="new-group-widget" data-group-id="{{ group.id }}" style="flex: 1;">
-                        <i class="bi bi-puzzle"></i> Ajouter un widget
-                    </button>
+                <button class="btn-add-link edit-only" data-action="new-link" data-group-id="{{ group.id }}">
+                    <i class="bi bi-plus"></i> Ajouter un lien
+                </button>
+            </div>
+            {% endfor %}
+
+            {% for gw in grid_widgets if gw.grid_row >= 0 %}
+            <div class="grid-widget-card size-icon-{{ gw.icon_size }} size-text-{{ gw.text_size }}"
+                 data-grid-widget-id="{{ gw.id }}" data-widget-type="{{ gw.type }}"
+                 style="grid-column: {{ gw.grid_col + 1 }} / span {{ gw.col_span }}; grid-row: {{ gw.grid_row + 1 }} / span {{ gw.row_span }};">
+
+                <div class="edit-overlay group-overlay">
+                    <button class="ov-btn drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></button>
+                    <button class="ov-btn" title="Modifier" data-action="edit-grid-widget"
+                            data-id="{{ gw.id }}"><i class="bi bi-pencil"></i></button>
+                    <button class="ov-btn ov-danger" title="Supprimer" data-action="delete-grid-widget"
+                            data-id="{{ gw.id }}"><i class="bi bi-trash"></i></button>
                 </div>
+
+                {% if gw.type == 'clock' %}
+                <div class="gw-card-body gw-clock">
+                    <div class="gw-clock-time">--:--</div>
+                    <div class="gw-clock-date"></div>
+                </div>
+                {% elif gw.type == 'weather' %}
+                <div class="gw-card-body gw-weather">
+                    <i class="bi bi-cloud-sun"></i>
+                    <span class="gw-temp">--°C</span>
+                    <small>{{ gw.config.get('city', '') }}</small>
+                </div>
+                {% elif gw.type == 'note' %}
+                <div class="gw-card-body gw-note">
+                    <div class="gw-note-content">{{ gw.config.get('text', 'Note vide') }}</div>
+                </div>
+                {% elif gw.type == 'health' %}
+                <div class="gw-card-body gw-health">
+                    <div class="gw-health-item"><i class="bi bi-cpu"></i> <span class="gw-health-value">--%</span></div>
+                    <div class="gw-health-item"><i class="bi bi-memory"></i> <span class="gw-health-value">--%</span></div>
+                    <div class="gw-health-item"><i class="bi bi-device-hdd"></i> <span class="gw-health-value">--%</span></div>
+                </div>
+                {% elif gw.type == 'calendar' %}
+                <div class="gw-card-body gw-calendar">
+                    <i class="bi bi-calendar3"></i>
+                    <span>Calendrier</span>
+                    <div class="gw-calendar-events"></div>
+                </div>
+                {% elif gw.type == 'camera' %}
+                <div class="gw-card-body gw-camera">
+                    <i class="bi bi-camera-video"></i>
+                    <span>Caméra</span>
+                    <div class="gw-camera-feed"></div>
+                </div>
+                {% else %}
+                <div class="gw-card-body gw-generic">
+                    <i class="bi bi-puzzle"></i>
+                    <span>{{ gw.type }}</span>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
 
@@ -525,19 +527,23 @@
     </div>
 </div>
 
-<!-- MODAL GROUP WIDGET -->
-<div class="modal fade" id="groupWidgetModal" tabindex="-1">
+<!-- MODAL GRID WIDGET -->
+<div class="modal fade" id="gridWidgetModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="groupWidgetForm">
+            <form id="gridWidgetForm">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="groupWidgetModalTitle">Ajouter un widget</h5>
+                    <h5 class="modal-title" id="gridWidgetModalTitle">Ajouter un widget</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <input type="hidden" name="grid_widget_id" id="gridWidgetId">
+                    <input type="hidden" name="grid_col" id="gridWidgetCol">
+                    <input type="hidden" name="grid_row" id="gridWidgetRow">
+                    
                     <div class="mb-3">
                         <label class="form-label">Type de widget</label>
-                        <select class="form-select" name="type" id="groupWidgetType" required>
+                        <select class="form-select" name="type" id="gridWidgetType" required>
                             <option value="">-- Choisir --</option>
                             <option value="clock">⏰ Horloge</option>
                             <option value="weather">🌤️ Météo</option>
@@ -565,6 +571,19 @@
                                 <label class="form-label">Longitude</label>
                                 <input type="number" step="0.01" class="form-control" name="weather_lon">
                             </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label">Largeur (colonnes)</label>
+                            <input type="number" class="form-control" name="col_span" id="gridWidgetColSpan" min="1" max="4" value="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Hauteur (lignes)</label>
+                            <input type="number" class="form-control" name="row_span" id="gridWidgetRowSpan" min="1" max="4" value="1">
                         </div>
                     </div>
                     
@@ -730,45 +749,49 @@
                                     </div>
                                 </div>
                                 <small class="form-text text-muted">CPU, RAM et disque du serveur</small>
-                                                        <div class="settings-widget-row">
-                                                            <div class="d-flex align-items-center justify-content-between">
-                                                                <strong><i class="bi bi-calendar3"></i> Calendrier (Nextcloud)</strong>
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox" name="calendar_enabled" checked>
-                                                                </div>
-                                                            </div>
-                                                            <div class="row g-2 mt-1">
-                                                                <div class="col-12">
-                                                                    <input type="text" class="form-control form-control-sm" name="caldav_url"
-                                                                           value="{{ settings.get('caldav_url', '') }}" 
-                                                                           placeholder="https://nextcloud.exemple.com/remote.php/dav">
-                                                                </div>
-                                                                <div class="col-6">
-                                                                    <input type="text" class="form-control form-control-sm" name="caldav_username"
-                                                                           value="{{ settings.get('caldav_username', '') }}" 
-                                                                           placeholder="Utilisateur">
-                                                                </div>
-                                                                <div class="col-6">
-                                                                    <input type="password" class="form-control form-control-sm" name="caldav_password"
-                                                                           value="{{ settings.get('caldav_password', '') }}" 
-                                                                           placeholder="Mot de passe">
-                                                                </div>
-                                                            </div>
-                                                            <small class="form-text text-muted">Connexion CalDAV pour synchroniser vos événements</small>
-                                                        </div>
-                                                        <div class="settings-widget-row">
-                                                            <div class="d-flex align-items-center justify-content-between">
-                                                                <strong><i class="bi bi-camera-video"></i> Caméras de sécurité</strong>
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox" name="camera_enabled" checked>
-                                                                </div>
-                                                            </div>
-                                                            <div class="mt-2">
-                                                                <textarea class="form-control form-control-sm" name="camera_urls" rows="4" 
-                                                                          placeholder="Une URL par ligne:&#10;Caméra Entrée|http://192.168.1.100/snapshot.jpg&#10;Caméra Jardin|http://192.168.1.101/snapshot.jpg">{{ settings.get('camera_urls', '') }}</textarea>
-                                                                <small class="form-text text-muted">Format: Nom|URL (un flux par ligne)</small>
-                                                            </div>
-                                                        </div>
+                            </div>
+                            {% set wcal = widgets.get('calendar', {}) %}
+                            <div class="settings-widget-row">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <strong><i class="bi bi-calendar3"></i> Calendrier (Nextcloud)</strong>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="calendar_enabled"
+                                               {% if wcal and wcal.enabled %}checked{% endif %}>
+                                    </div>
+                                </div>
+                                <div class="row g-2 mt-1">
+                                    <div class="col-12">
+                                        <input type="text" class="form-control form-control-sm" name="caldav_url"
+                                               value="{{ settings.get('caldav_url', '') }}" 
+                                               placeholder="https://nextcloud.exemple.com/remote.php/dav">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="text" class="form-control form-control-sm" name="caldav_username"
+                                               value="{{ settings.get('caldav_username', '') }}" 
+                                               placeholder="Utilisateur">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="password" class="form-control form-control-sm" name="caldav_password"
+                                               value="{{ settings.get('caldav_password', '') }}" 
+                                               placeholder="Mot de passe">
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Connexion CalDAV pour synchroniser vos événements</small>
+                            </div>
+                            {% set wcam = widgets.get('camera', {}) %}
+                            <div class="settings-widget-row">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <strong><i class="bi bi-camera-video"></i> Caméras de sécurité</strong>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="camera_enabled"
+                                               {% if wcam and wcam.enabled %}checked{% endif %}>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <textarea class="form-control form-control-sm" name="camera_urls" rows="4" 
+                                              placeholder="Une URL par ligne:&#10;Caméra Entrée|http://192.168.1.100/snapshot.jpg&#10;Caméra Jardin|http://192.168.1.101/snapshot.jpg">{{ settings.get('camera_urls', '') }}</textarea>
+                                    <small class="form-text text-muted">Format: Nom|URL (un flux par ligne)</small>
+                                </div>
                             </div>
                         </div>
                         <div class="tab-pane fade" id="stServices">
@@ -822,7 +845,6 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
 <!-- MODAL SERVICE -->
 <div class="modal fade" id="serviceModal" tabindex="-1">
@@ -910,6 +932,7 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -917,6 +940,7 @@ const PAGE_DATA = {
     settings: {{ settings | tojson }},
     groups: {{ groups_json | safe }},
     widgets: {{ widgets_json | safe }},
+    grid_widgets: {{ grid_widgets_json | safe }},
     pages: {{ pages_json | safe }},
     services: {{ services_json | safe }},
     currentPage: {{ current_page }},

@@ -84,6 +84,7 @@ def index():
     services = models.get_services()
     profiles = models.get_profiles()
     current_profile = models.get_profile(profile_id)
+    grid_widgets = models.get_grid_widgets(page_id)
     
     return render_template('index.html',
                            settings=settings, groups=groups, widgets=widgets,
@@ -91,11 +92,13 @@ def index():
                            services=services,
                            profiles=profiles,
                            current_profile=current_profile,
+                           grid_widgets=grid_widgets,
                            groups_json=json.dumps(groups),
                            widgets_json=json.dumps(widgets),
                            pages_json=json.dumps(pages),
                            services_json=json.dumps(services),
-                           profiles_json=json.dumps(profiles))
+                           profiles_json=json.dumps(profiles),
+                           grid_widgets_json=json.dumps(grid_widgets))
 
 
 @app.route('/admin')
@@ -299,59 +302,79 @@ def api_reorder_links():
     return jsonify(ok=True)
 
 
-# ── API : Group Widgets ───────────────────────────────────
+# ── API : Grid Widgets (widgets autonomes sur la grille) ──
 
-@app.route('/api/group-widgets', methods=['POST'])
-def api_create_group_widget():
-    """Créer un widget dans un groupe"""
+@app.route('/api/grid-widgets', methods=['POST'])
+def api_create_grid_widget():
+    """Créer un widget autonome sur la grille"""
     try:
         data = request.get_json() or {}
-        group_id = data.get('group_id')
         wtype = (data.get('type') or '').strip()
-        if not group_id or not wtype:
-            return jsonify(error='group_id et type requis'), 400
+        if not wtype:
+            return jsonify(error='type requis'), 400
         
         allowed_types = {'clock', 'weather', 'calendar', 'camera', 'service', 'health', 'note'}
         if wtype not in allowed_types:
             return jsonify(error=f'Type invalide. Types autorisés: {", ".join(allowed_types)}'), 400
         
-        wid = models.create_group_widget(
-            group_id=int(group_id),
+        page_id = data.get('page_id', 1)
+        wid = models.create_grid_widget(
+            page_id=int(page_id),
             wtype=wtype,
             config=data.get('config', {}),
             icon_size=data.get('icon_size', 'medium'),
-            text_size=data.get('text_size', 'medium'))
+            text_size=data.get('text_size', 'medium'),
+            col_span=int(data.get('col_span', 1)),
+            row_span=int(data.get('row_span', 1)),
+            grid_col=int(data.get('grid_col', 0)),
+            grid_row=int(data.get('grid_row', -1)))
         return jsonify(id=wid), 201
     except Exception as e:
-        logger.error(f"Erreur création widget groupe: {e}")
+        logger.error(f"Erreur création widget grille: {e}")
         return jsonify(error=f'Erreur: {str(e)}'), 500
 
 
-@app.route('/api/group-widgets/<int:wid>', methods=['PUT'])
-def api_update_group_widget(wid):
-    """Mettre à jour un widget de groupe"""
+@app.route('/api/grid-widgets/<int:wid>', methods=['PUT'])
+def api_update_grid_widget(wid):
+    """Mettre à jour un widget de grille"""
     try:
         data = request.get_json() or {}
-        models.update_group_widget(
+        models.update_grid_widget(
             wid,
             wtype=data.get('type'),
             config=data.get('config'),
             icon_size=data.get('icon_size'),
-            text_size=data.get('text_size'))
+            text_size=data.get('text_size'),
+            col_span=int(data['col_span']) if 'col_span' in data else None,
+            row_span=int(data['row_span']) if 'row_span' in data else None)
         return jsonify(ok=True)
     except Exception as e:
-        logger.error(f"Erreur mise à jour widget groupe: {e}")
+        logger.error(f"Erreur mise à jour widget grille: {e}")
         return jsonify(error=f'Erreur: {str(e)}'), 500
 
 
-@app.route('/api/group-widgets/<int:wid>', methods=['DELETE'])
-def api_delete_group_widget(wid):
-    """Supprimer un widget de groupe"""
+@app.route('/api/grid-widgets/<int:wid>/move', methods=['POST'])
+def api_move_grid_widget(wid):
+    """Déplacer un widget sur la grille"""
     try:
-        models.delete_group_widget(wid)
+        data = request.get_json() or {}
+        if 'grid_row' not in data or 'grid_col' not in data:
+            return jsonify(error='grid_row et grid_col requis'), 400
+        models.move_grid_widget(wid, int(data['grid_row']), int(data['grid_col']))
         return jsonify(ok=True)
     except Exception as e:
-        logger.error(f"Erreur suppression widget groupe: {e}")
+        logger.error(f"Erreur déplacement widget: {e}")
+        return jsonify(error=f'Erreur: {str(e)}'), 500
+
+
+@app.route('/api/grid-widgets/<int:wid>', methods=['DELETE'])
+def api_delete_grid_widget(wid):
+    """Supprimer un widget de grille"""
+    try:
+        models.delete_grid_widget(wid)
+        return jsonify(ok=True)
+    except Exception as e:
+        logger.error(f"Erreur suppression widget grille: {e}")
         return jsonify(error=f'Erreur: {str(e)}'), 500
 
 
@@ -547,7 +570,7 @@ def api_upload_background():
 # Calendar events (Nextcloud CalDAV)
 @app.route('/api/calendar/events')
 def api_calendar_events():
-    """Récupère les événements du calendrier Nextcloud via CalDAV."""
+    """Récupère les événements du calendrier via CalDAV (public ou authentifié)."""
     if not CALDAV_AVAILABLE:
         return jsonify(error="caldav non installé"), 503
 
@@ -555,61 +578,108 @@ def api_calendar_events():
 
     # Récupérer les paramètres du calendrier depuis les settings
     settings = models.get_settings(profile_id)
-    caldav_url = settings.get('caldav_url', '') or ''
-    caldav_username = settings.get('caldav_username', '') or ''
-    caldav_password = settings.get('caldav_password', '') or ''
+    caldav_url = (settings.get('caldav_url', '') or '').strip()
+    caldav_username = (settings.get('caldav_username', '') or '').strip()
+    caldav_password = (settings.get('caldav_password', '') or '').strip()
 
-    if not all([caldav_url, caldav_username, caldav_password]):
-        return jsonify(events=[], message="Configuration CalDAV manquante")
+    if not caldav_url:
+        return jsonify(events=[], message="URL CalDAV non configurée")
     
     try:
-        # Connexion au serveur CalDAV
-        client = caldav.DAVClient(
-            url=caldav_url,
-            username=caldav_username,
-            password=caldav_password
-        )
-        principal = client.principal()
-        calendars = principal.calendars()
-        
-        if not calendars:
-            return jsonify(events=[], message="Aucun calendrier trouvé")
-        
-        # Récupérer les événements des 7 prochains jours
         start = datetime.now()
         end = start + timedelta(days=7)
-        
         all_events = []
-        for calendar in calendars:
-            try:
-                events = calendar.date_search(start=start, end=end)
-                for event in events:
-                    try:
-                        vevent = event.icalendar_component
-                        summary = str(vevent.get('summary', 'Sans titre'))
-                        dtstart = vevent.get('dtstart')
-                        location = vevent.get('location', '')
-                        
-                        if dtstart:
-                            start_dt = dtstart.dt
-                            if isinstance(start_dt, datetime):
-                                start_str = start_dt.strftime('%d/%m %H:%M')
-                            else:
-                                start_str = start_dt.strftime('%d/%m')
+        
+        # Détecter si c'est un calendrier public (URL contenant public-calendars ou ?export)
+        is_public = 'public-calendars' in caldav_url or caldav_url.endswith('?export')
+        
+        if is_public:
+            # Calendrier public : récupérer directement l'ICS
+            import requests as req
+            resp = req.get(caldav_url, timeout=10)
+            resp.raise_for_status()
+            
+            from icalendar import Calendar as iCalendar
+            cal = iCalendar.from_ical(resp.text)
+            
+            for component in cal.walk():
+                if component.name != 'VEVENT':
+                    continue
+                try:
+                    summary = str(component.get('summary', 'Sans titre'))
+                    dtstart = component.get('dtstart')
+                    location = component.get('location', '')
+                    
+                    if dtstart:
+                        start_dt = dtstart.dt
+                        # Filtrer les événements dans la plage de 7 jours
+                        if hasattr(start_dt, 'date'):
+                            check_date = start_dt.date()
                         else:
-                            start_str = ''
-                        
-                        all_events.append({
-                            'title': summary,
-                            'start': start_str,
-                            'location': str(location) if location else ''
-                        })
-                    except Exception as e:
-                        logging.warning(f"Erreur parsing événement: {e}")
-                        continue
-            except Exception as e:
-                logging.warning(f"Erreur récupération calendrier: {e}")
-                continue
+                            check_date = start_dt
+                        if check_date < start.date() or check_date > end.date():
+                            continue
+                        if isinstance(start_dt, datetime):
+                            start_str = start_dt.strftime('%d/%m %H:%M')
+                        else:
+                            start_str = start_dt.strftime('%d/%m')
+                    else:
+                        start_str = ''
+                    
+                    all_events.append({
+                        'title': summary,
+                        'start': start_str,
+                        'location': str(location) if location else ''
+                    })
+                except Exception as e:
+                    logging.warning(f"Erreur parsing événement public: {e}")
+                    continue
+        else:
+            # Calendrier authentifié via CalDAV
+            if not caldav_username or not caldav_password:
+                return jsonify(events=[], message="Identifiants CalDAV manquants pour ce type d'URL")
+            
+            client = caldav.DAVClient(
+                url=caldav_url,
+                username=caldav_username,
+                password=caldav_password
+            )
+            principal = client.principal()
+            calendars = principal.calendars()
+            
+            if not calendars:
+                return jsonify(events=[], message="Aucun calendrier trouvé")
+            
+            for calendar in calendars:
+                try:
+                    events = calendar.date_search(start=start, end=end)
+                    for event in events:
+                        try:
+                            vevent = event.icalendar_component
+                            summary = str(vevent.get('summary', 'Sans titre'))
+                            dtstart = vevent.get('dtstart')
+                            location = vevent.get('location', '')
+                            
+                            if dtstart:
+                                start_dt = dtstart.dt
+                                if isinstance(start_dt, datetime):
+                                    start_str = start_dt.strftime('%d/%m %H:%M')
+                                else:
+                                    start_str = start_dt.strftime('%d/%m')
+                            else:
+                                start_str = ''
+                            
+                            all_events.append({
+                                'title': summary,
+                                'start': start_str,
+                                'location': str(location) if location else ''
+                            })
+                        except Exception as e:
+                            logging.warning(f"Erreur parsing événement: {e}")
+                            continue
+                except Exception as e:
+                    logging.warning(f"Erreur récupération calendrier: {e}")
+                    continue
         
         # Trier par date
         all_events.sort(key=lambda x: x['start'])

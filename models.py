@@ -81,13 +81,16 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS group_widgets (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_id    INTEGER NOT NULL,
+            page_id     INTEGER NOT NULL DEFAULT 1,
             type        TEXT    NOT NULL,
             config      TEXT    NOT NULL DEFAULT '{}',
             icon_size   TEXT    NOT NULL DEFAULT 'medium',
             text_size   TEXT    NOT NULL DEFAULT 'medium',
-            sort_order  INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (group_id) REFERENCES groups_(id) ON DELETE CASCADE
+            col_span    INTEGER NOT NULL DEFAULT 1,
+            row_span    INTEGER NOT NULL DEFAULT 1,
+            grid_col    INTEGER NOT NULL DEFAULT 0,
+            grid_row    INTEGER NOT NULL DEFAULT -1,
+            FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS services (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,7 +103,7 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
-        CREATE INDEX IF NOT EXISTS idx_group_widgets_group ON group_widgets(group_id);
+        CREATE INDEX IF NOT EXISTS idx_grid_widgets_page ON group_widgets(page_id);
     ''')
 
     # ── Migrations ────────────────────────────────────────
@@ -156,6 +159,27 @@ def init_db():
             c = i % gcols
             conn.execute('UPDATE groups_ SET grid_row=?, grid_col=? WHERE id=?',
                          (r, c, row[0]))
+
+    # Migration group_widgets : old schema had group_id, new schema has page_id + grid columns
+    gw_cols = [r[1] for r in conn.execute("PRAGMA table_info(group_widgets)").fetchall()]
+    if gw_cols and 'group_id' in gw_cols and 'page_id' not in gw_cols:
+        conn.execute('DROP TABLE group_widgets')
+        conn.execute('''
+            CREATE TABLE group_widgets (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id     INTEGER NOT NULL DEFAULT 1,
+                type        TEXT    NOT NULL,
+                config      TEXT    NOT NULL DEFAULT '{}',
+                icon_size   TEXT    NOT NULL DEFAULT 'medium',
+                text_size   TEXT    NOT NULL DEFAULT 'medium',
+                col_span    INTEGER NOT NULL DEFAULT 1,
+                row_span    INTEGER NOT NULL DEFAULT 1,
+                grid_col    INTEGER NOT NULL DEFAULT 0,
+                grid_row    INTEGER NOT NULL DEFAULT -1,
+                FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+            )
+        ''')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_grid_widgets_page ON group_widgets(page_id)')
 
     # Profil par défaut
     if not conn.execute('SELECT 1 FROM profiles LIMIT 1').fetchone():
@@ -371,10 +395,6 @@ def get_groups(page_id=None):
     links = [dict(r) for r in conn.execute(
         'SELECT * FROM links ORDER BY sort_order, id').fetchall()]
     
-    # Charger les group_widgets
-    group_widgets_rows = [dict(r) for r in conn.execute(
-        'SELECT * FROM group_widgets ORDER BY sort_order, id').fetchall()]
-    
     conn.close()
     
     # Organiser les liens par groupe
@@ -382,15 +402,8 @@ def get_groups(page_id=None):
     for lnk in links:
         by_group.setdefault(lnk['group_id'], []).append(lnk)
     
-    # Organiser les widgets par groupe
-    widgets_by_group = {}
-    for gw in group_widgets_rows:
-        gw['config'] = json.loads(gw['config'])
-        widgets_by_group.setdefault(gw['group_id'], []).append(gw)
-    
     for g in groups:
         g['links'] = by_group.get(g['id'], [])
-        g['group_widgets'] = widgets_by_group.get(g['id'], [])
     
     return groups
 
@@ -558,37 +571,38 @@ def delete_service(sid):
     conn.close()
 
 
-# ── Group Widgets (widgets dans les groupes) ──────────────
+# ── Grid Widgets (widgets autonomes sur la grille) ────────
 
-def get_group_widgets(group_id):
-    """Récupère tous les widgets d'un groupe"""
+def get_grid_widgets(page_id=1):
+    """Récupère tous les widgets de grille d'une page"""
     conn = get_db()
     rows = [dict(r) for r in conn.execute(
-        'SELECT * FROM group_widgets WHERE group_id=? ORDER BY sort_order, id',
-        (group_id,)).fetchall()]
+        'SELECT * FROM group_widgets WHERE page_id=? ORDER BY grid_row, grid_col, id',
+        (page_id,)).fetchall()]
     conn.close()
     for r in rows:
         r['config'] = json.loads(r['config'])
     return rows
 
 
-def create_group_widget(group_id, wtype, config=None, icon_size='medium', text_size='medium'):
-    """Ajoute un widget à un groupe"""
+def create_grid_widget(page_id, wtype, config=None, icon_size='medium', text_size='medium',
+                       col_span=1, row_span=1, grid_col=0, grid_row=-1):
+    """Crée un widget autonome sur la grille"""
     conn = get_db()
-    mx = conn.execute('SELECT COALESCE(MAX(sort_order),0) FROM group_widgets WHERE group_id=?',
-                      (group_id,)).fetchone()[0]
     cur = conn.execute(
-        'INSERT INTO group_widgets (group_id, type, config, icon_size, text_size, sort_order) '
-        'VALUES (?,?,?,?,?,?)',
-        (group_id, wtype, json.dumps(config or {}), icon_size, text_size, mx + 1))
+        'INSERT INTO group_widgets (page_id, type, config, icon_size, text_size, col_span, row_span, grid_col, grid_row) '
+        'VALUES (?,?,?,?,?,?,?,?,?)',
+        (page_id, wtype, json.dumps(config or {}), icon_size, text_size,
+         max(1, min(4, col_span)), max(1, min(4, row_span)), grid_col, grid_row))
     wid = cur.lastrowid
     conn.commit()
     conn.close()
     return wid
 
 
-def update_group_widget(wid, wtype=None, config=None, icon_size=None, text_size=None):
-    """Met à jour un widget de groupe"""
+def update_grid_widget(wid, wtype=None, config=None, icon_size=None, text_size=None,
+                       col_span=None, row_span=None):
+    """Met à jour un widget de grille"""
     conn = get_db()
     fields = []
     params = []
@@ -604,6 +618,12 @@ def update_group_widget(wid, wtype=None, config=None, icon_size=None, text_size=
     if text_size is not None:
         fields.append('text_size=?')
         params.append(text_size)
+    if col_span is not None:
+        fields.append('col_span=?')
+        params.append(max(1, min(4, col_span)))
+    if row_span is not None:
+        fields.append('row_span=?')
+        params.append(max(1, min(4, row_span)))
     if fields:
         params.append(wid)
         conn.execute(f"UPDATE group_widgets SET {','.join(fields)} WHERE id=?", params)
@@ -611,8 +631,17 @@ def update_group_widget(wid, wtype=None, config=None, icon_size=None, text_size=
     conn.close()
 
 
-def delete_group_widget(wid):
-    """Supprime un widget de groupe"""
+def move_grid_widget(wid, grid_row, grid_col):
+    """Déplace un widget sur la grille"""
+    conn = get_db()
+    conn.execute('UPDATE group_widgets SET grid_row=?, grid_col=? WHERE id=?',
+                 (grid_row, grid_col, wid))
+    conn.commit()
+    conn.close()
+
+
+def delete_grid_widget(wid):
+    """Supprime un widget de grille"""
     conn = get_db()
     conn.execute('DELETE FROM group_widgets WHERE id=?', (wid,))
     conn.commit()
@@ -631,6 +660,7 @@ def export_all():
         'links': [dict(r) for r in conn.execute('SELECT * FROM links ORDER BY id').fetchall()],
         'widgets': [],
         'services': [],
+        'grid_widgets': [],
     }
     for r in conn.execute('SELECT * FROM widgets ORDER BY sort_order').fetchall():
         w = dict(r)
@@ -640,6 +670,10 @@ def export_all():
         s = dict(r)
         s['config'] = json.loads(s['config'])
         data['services'].append(s)
+    for r in conn.execute('SELECT * FROM group_widgets ORDER BY id').fetchall():
+        gw = dict(r)
+        gw['config'] = json.loads(gw['config'])
+        data['grid_widgets'].append(gw)
     conn.close()
     return data
 
@@ -648,6 +682,7 @@ def import_all(data):
     conn = get_db()
     conn.execute('DELETE FROM links')
     conn.execute('DELETE FROM groups_')
+    conn.execute('DELETE FROM group_widgets')
     conn.execute('DELETE FROM pages')
     conn.execute('DELETE FROM services')
     conn.execute('DELETE FROM settings')
@@ -689,6 +724,15 @@ def import_all(data):
             (s['name'], s['type'], s.get('url', ''),
              s.get('api_key', ''), json.dumps(s.get('config', {})),
              s.get('enabled', 1), s.get('sort_order', 0)))
+
+    for gw in data.get('grid_widgets', []):
+        conn.execute(
+            'INSERT INTO group_widgets (page_id, type, config, grid_col, grid_row, col_span, row_span, icon_size, text_size) '
+            'VALUES (?,?,?,?,?,?,?,?,?)',
+            (gw.get('page_id', 1), gw['type'], json.dumps(gw.get('config', {})),
+             gw.get('grid_col', 0), gw.get('grid_row', 0),
+             gw.get('col_span', 1), gw.get('row_span', 1),
+             gw.get('icon_size', 'medium'), gw.get('text_size', 'medium')))
 
     conn.commit()
     conn.close()

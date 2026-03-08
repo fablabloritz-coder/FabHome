@@ -7,6 +7,12 @@
        HELPERS
        ══════════════════════════════════════ */
 
+    function escHtml(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
     function api(method, url, body) {
         var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify(body);
@@ -54,7 +60,15 @@
             if (g.grid_row < 0) return;
             for (var r = g.grid_row; r < g.grid_row + (g.row_span || 1); r++) {
                 for (var c = g.grid_col; c < g.grid_col + (g.col_span || 1); c++) {
-                    occupiedMap[r + ',' + c] = g.id;
+                    occupiedMap[r + ',' + c] = 'g_' + g.id;
+                }
+            }
+        });
+        (PAGE_DATA.grid_widgets || []).forEach(function (w) {
+            if (w.grid_row < 0) return;
+            for (var r = w.grid_row; r < w.grid_row + (w.row_span || 1); r++) {
+                for (var c = w.grid_col; c < w.grid_col + (w.col_span || 1); c++) {
+                    occupiedMap[r + ',' + c] = 'w_' + w.id;
                 }
             }
         });
@@ -112,12 +126,42 @@
         }
     }
 
-    function onEmptyCellClick() {
+    function onEmptyCellClick(e) {
         pendingPosition = {
             row: parseInt(this.dataset.row),
             col: parseInt(this.dataset.col)
         };
-        openGroupModal(null);
+        // Remove any existing context menu
+        var old = qs('#cellContextMenu');
+        if (old) old.remove();
+        // Build dropdown at click position
+        var menu = document.createElement('div');
+        menu.id = 'cellContextMenu';
+        menu.className = 'dropdown-menu show shadow';
+        menu.style.cssText = 'position:fixed;z-index:9999;';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.innerHTML =
+            '<button class="dropdown-item" data-choice="group"><i class="bi bi-collection me-2"></i>Nouveau groupe</button>' +
+            '<button class="dropdown-item" data-choice="widget"><i class="bi bi-grid-1x2 me-2"></i>Nouveau widget</button>';
+        document.body.appendChild(menu);
+        menu.addEventListener('click', function (ev) {
+            var btn = ev.target.closest('[data-choice]');
+            if (!btn) return;
+            menu.remove();
+            if (btn.dataset.choice === 'group') openGroupModal(null);
+            else openGridWidgetModal(null);
+        });
+        // Close on click outside
+        setTimeout(function () {
+            document.addEventListener('click', function handler(ev) {
+                if (!menu.contains(ev.target)) {
+                    menu.remove();
+                    pendingPosition = null;
+                    document.removeEventListener('click', handler);
+                }
+            });
+        }, 0);
     }
 
     function updateUnplacedSection() {
@@ -260,11 +304,11 @@
         if (!editMode) return;
         var handle = e.target.closest('.drag-handle');
         if (!handle) return;
-        var card = handle.closest('.group-card');
+        var card = handle.closest('.group-card') || handle.closest('.grid-widget-card');
         if (card) card.draggable = true;
     });
     document.addEventListener('mouseup', function () {
-        qsa('.group-card').forEach(function (c) { c.draggable = false; });
+        qsa('.group-card, .grid-widget-card').forEach(function (c) { c.draggable = false; });
     });
 
     /* ══════════════════════════════════════
@@ -390,35 +434,53 @@
         });
     }
 
-    /* -- Group Widget -- */
-    var groupWidgetModal = null;
+    /* -- Grid Widget (standalone on board) -- */
+    var gridWidgetModal = null;
     
-    function openGroupWidgetModal(widgetId, groupId) {
-        if (!groupWidgetModal) {
-            var gwm = qs('#groupWidgetModal');
-            if (gwm && typeof bootstrap !== 'undefined') groupWidgetModal = new bootstrap.Modal(gwm);
+    function openGridWidgetModal(widgetId) {
+        if (!gridWidgetModal) {
+            var gwm = qs('#gridWidgetModal');
+            if (gwm && typeof bootstrap !== 'undefined') gridWidgetModal = new bootstrap.Modal(gwm);
         }
-        if (!groupWidgetModal) return;
+        if (!gridWidgetModal) return;
         
-        var form = qs('#groupWidgetForm');
-        var title = qs('#groupWidgetModalTitle');
-        var typeSelect = qs('#groupWidgetType');
+        var form = qs('#gridWidgetForm');
+        var title = qs('#gridWidgetModalTitle');
+        var typeSelect = qs('#gridWidgetType');
         
         if (widgetId) {
-            // TODO: Mode édition - charger les données du widget
             title.textContent = 'Modifier le widget';
             form.dataset.editId = widgetId;
+            // Load existing data
+            var existing = (PAGE_DATA.grid_widgets || []).find(function(w) { return w.id === widgetId; });
+            if (existing) {
+                typeSelect.value = existing.type;
+                typeSelect.dispatchEvent(new Event('change'));
+                if (existing.type === 'note' && form.elements.note_text) form.elements.note_text.value = (existing.config || {}).text || '';
+                if (existing.type === 'weather') {
+                    if (form.elements.weather_city) form.elements.weather_city.value = (existing.config || {}).city || '';
+                    if (form.elements.weather_lat) form.elements.weather_lat.value = (existing.config || {}).latitude || '';
+                    if (form.elements.weather_lon) form.elements.weather_lon.value = (existing.config || {}).longitude || '';
+                }
+                form.elements.icon_size.value = existing.icon_size || 'medium';
+                form.elements.text_size.value = existing.text_size || 'medium';
+                qs('#gridWidgetColSpan').value = existing.col_span || 1;
+                qs('#gridWidgetRowSpan').value = existing.row_span || 1;
+            }
         } else {
             title.textContent = 'Ajouter un widget';
             delete form.dataset.editId;
             form.reset();
-            form.elements.group_id.value = groupId;
+            if (pendingPosition) {
+                qs('#gridWidgetCol').value = pendingPosition.col;
+                qs('#gridWidgetRow').value = pendingPosition.row;
+            }
         }
-        groupWidgetModal.show();
+        gridWidgetModal.show();
     }
     
     // Gérer l'affichage des configs selon le type
-    var typeSelect = qs('#groupWidgetType');
+    var typeSelect = qs('#gridWidgetType');
     if (typeSelect) {
         typeSelect.addEventListener('change', function() {
             var type = this.value;
@@ -427,17 +489,9 @@
         });
     }
     
-    var groupWidgetForm = qs('#groupWidgetForm');
-    if (groupWidgetForm) {
-        // Ajouter le champ group_id caché si inexistant
-        if (!groupWidgetForm.elements.group_id) {
-            var hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'group_id';
-            groupWidgetForm.appendChild(hiddenInput);
-        }
-        
-        groupWidgetForm.addEventListener('submit', function (e) {
+    var gridWidgetForm = qs('#gridWidgetForm');
+    if (gridWidgetForm) {
+        gridWidgetForm.addEventListener('submit', function (e) {
             e.preventDefault();
             var f = e.target;
             var config = {};
@@ -452,18 +506,29 @@
             }
             
             var body = {
-                group_id: parseInt(f.elements.group_id.value),
+                page_id: PAGE_DATA.currentPage || 1,
                 type: type,
                 config: config,
                 icon_size: f.elements.icon_size.value,
-                text_size: f.elements.text_size.value
+                text_size: f.elements.text_size.value,
+                col_span: parseInt(qs('#gridWidgetColSpan').value) || 1,
+                row_span: parseInt(qs('#gridWidgetRowSpan').value) || 1,
+                grid_col: parseInt(qs('#gridWidgetCol').value) || 0,
+                grid_row: parseInt(qs('#gridWidgetRow').value) || 0
             };
             
             var eid = f.dataset.editId;
-            var p = eid ? api('PUT', '/api/group-widgets/' + eid, body)
-                        : api('POST', '/api/group-widgets', body);
+            var p = eid ? api('PUT', '/api/grid-widgets/' + eid, body)
+                        : api('POST', '/api/grid-widgets', body);
             p.then(function () { location.href = editUrl(); })
              .catch(function (err) { alert(err.message); });
+        });
+    }
+
+    var gridWidgetModalEl = qs('#gridWidgetModal');
+    if (gridWidgetModalEl) {
+        gridWidgetModalEl.addEventListener('hidden.bs.modal', function () {
+            pendingPosition = null;
         });
     }
 
@@ -478,7 +543,11 @@
                 theme: f.elements.theme.value,
                 background_url: f.elements.background_url.value,
                 greeting_name: f.elements.greeting_name.value,
-                search_provider: f.elements.search_provider.value
+                search_provider: f.elements.search_provider.value,
+                caldav_url: f.elements.caldav_url ? f.elements.caldav_url.value : '',
+                caldav_username: f.elements.caldav_username ? f.elements.caldav_username.value : '',
+                caldav_password: f.elements.caldav_password ? f.elements.caldav_password.value : '',
+                camera_urls: f.elements.camera_urls ? f.elements.camera_urls.value : ''
             };
             var widgetsBody = {
                 greeting: { enabled: f.elements.greeting_enabled.checked, config: {} },
@@ -492,7 +561,9 @@
                         longitude: parseFloat(f.elements.weather_lon.value) || 6.18
                     }
                 },
-                health: { enabled: f.elements.health_enabled.checked, config: {} }
+                health: { enabled: f.elements.health_enabled.checked, config: {} },
+                calendar: { enabled: f.elements.calendar_enabled ? f.elements.calendar_enabled.checked : false, config: {} },
+                camera: { enabled: f.elements.camera_enabled ? f.elements.camera_enabled.checked : false, config: {} }
             };
             Promise.all([
                 api('PUT', '/api/settings', settingsBody),
@@ -775,6 +846,7 @@
        ══════════════════════════════════════ */
 
     var draggingGroupId = null;
+    var draggingGridWidgetId = null;
     var draggingColSpan = 1;
     var draggingRowSpan = 1;
     var dragSource = null;
@@ -782,28 +854,40 @@
 
     if (gridBoard) {
         gridBoard.addEventListener('dragstart', function (e) {
-            var card = e.target.closest('.group-card');
-            if (!card || !editMode) return;
             if (e.target.closest('.link-wrap')) return;
-            draggingGroupId = parseInt(card.dataset.groupId);
-            var g = findGroup(draggingGroupId);
-            draggingColSpan = g ? (g.col_span || 1) : 1;
-            draggingRowSpan = g ? (g.row_span || 1) : 1;
-            dragSource = 'grid';
-            card.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', 'group');
+            var card = e.target.closest('.group-card');
+            var wcard = e.target.closest('.grid-widget-card');
+            if (card && editMode) {
+                draggingGroupId = parseInt(card.dataset.groupId);
+                var g = findGroup(draggingGroupId);
+                draggingColSpan = g ? (g.col_span || 1) : 1;
+                draggingRowSpan = g ? (g.row_span || 1) : 1;
+                dragSource = 'grid';
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', 'group');
+            } else if (wcard && editMode) {
+                draggingGridWidgetId = parseInt(wcard.dataset.gridWidgetId);
+                var gw = (PAGE_DATA.grid_widgets || []).find(function(w) { return w.id === draggingGridWidgetId; });
+                draggingColSpan = gw ? (gw.col_span || 1) : 1;
+                draggingRowSpan = gw ? (gw.row_span || 1) : 1;
+                dragSource = 'grid';
+                wcard.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', 'gridwidget');
+            }
         });
 
         gridBoard.addEventListener('dragover', function (e) {
-            if (!draggingGroupId) return;
+            if (!draggingGroupId && !draggingGridWidgetId) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
 
             var cell = getCellFromPoint(e.clientX, e.clientY);
             if (!cell || !highlight) return;
 
-            var ok = canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, draggingGroupId);
+            var excludeId = draggingGroupId ? ('g_' + draggingGroupId) : ('w_' + draggingGridWidgetId);
+            var ok = canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, excludeId);
             highlight.style.gridColumn = (cell.col + 1) + ' / span ' + draggingColSpan;
             highlight.style.gridRow = (cell.row + 1) + ' / span ' + draggingRowSpan;
             highlight.classList.add('visible');
@@ -818,18 +902,28 @@
 
         gridBoard.addEventListener('drop', function (e) {
             e.preventDefault();
-            if (!draggingGroupId) return;
             var cell = getCellFromPoint(e.clientX, e.clientY);
             if (!cell) return;
-            var ok = canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, draggingGroupId);
-            if (!ok) return;
 
-            api('POST', '/api/groups/' + draggingGroupId + '/move', {
-                grid_row: cell.row,
-                grid_col: cell.col
-            }).then(function () {
-                location.href = editUrl();
-            }).catch(function (err) { alert(err.message); });
+            if (draggingGroupId) {
+                var excludeId = 'g_' + draggingGroupId;
+                if (!canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, excludeId)) return;
+                api('POST', '/api/groups/' + draggingGroupId + '/move', {
+                    grid_row: cell.row,
+                    grid_col: cell.col
+                }).then(function () {
+                    location.href = editUrl();
+                }).catch(function (err) { alert(err.message); });
+            } else if (draggingGridWidgetId) {
+                var excludeId2 = 'w_' + draggingGridWidgetId;
+                if (!canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, excludeId2)) return;
+                api('POST', '/api/grid-widgets/' + draggingGridWidgetId + '/move', {
+                    grid_row: cell.row,
+                    grid_col: cell.col
+                }).then(function () {
+                    location.href = editUrl();
+                }).catch(function (err) { alert(err.message); });
+            }
         });
     }
 
@@ -881,12 +975,13 @@
     });
 
     document.addEventListener('dragend', function () {
-        if (draggingGroupId) {
-            qsa('.group-card.dragging, .palette-block.dragging').forEach(function (el) {
+        if (draggingGroupId || draggingGridWidgetId) {
+            qsa('.group-card.dragging, .palette-block.dragging, .grid-widget-card.dragging').forEach(function (el) {
                 el.classList.remove('dragging');
             });
             if (highlight) highlight.classList.remove('visible');
             draggingGroupId = null;
+            draggingGridWidgetId = null;
             dragSource = null;
         }
         if (draggedLink) {
@@ -950,15 +1045,15 @@
                         .catch(function (err) { alert(err.message); });
                 }
                 break;
-            case 'new-group-widget':
-                openGroupWidgetModal(null, parseInt(btn.dataset.groupId));
+            case 'new-grid-widget':
+                openGridWidgetModal(null);
                 break;
-            case 'edit-group-widget':
-                openGroupWidgetModal(id);
+            case 'edit-grid-widget':
+                openGridWidgetModal(id);
                 break;
-            case 'delete-group-widget':
+            case 'delete-grid-widget':
                 if (confirm('Supprimer ce widget ?')) {
-                    api('DELETE', '/api/group-widgets/' + id)
+                    api('DELETE', '/api/grid-widgets/' + id)
                         .then(function () { location.href = editUrl(); })
                         .catch(function (err) { alert(err.message); });
                 }
@@ -981,10 +1076,12 @@
                 }
                 break;
             case 'new-service':
-                openServiceModal(null);
+                if (settingsModal) settingsModal.hide();
+                setTimeout(function() { openServiceModal(null); }, 350);
                 break;
             case 'edit-service':
-                openServiceModal(id);
+                if (settingsModal) settingsModal.hide();
+                setTimeout(function() { openServiceModal(id); }, 350);
                 break;
             case 'delete-service':
                 if (confirm('Supprimer ce service ?')) {
@@ -1013,6 +1110,76 @@
     loadHealth();
     setInterval(loadHealth, 30000);
     loadServices();
+
+    // ── Grid Widget live updates ──
+    function updateGridWidgetClocks() {
+        qsa('.grid-widget-card[data-widget-type="clock"]').forEach(function(card) {
+            var t = card.querySelector('.gw-clock-time');
+            var d = card.querySelector('.gw-clock-date');
+            if (!t) return;
+            var now = new Date();
+            t.textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            if (d) d.textContent = now.toLocaleDateString('fr-FR', {
+                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+            });
+        });
+    }
+    function updateGridWidgetHealth() {
+        var healthCards = qsa('.grid-widget-card[data-widget-type="health"]');
+        if (!healthCards.length) return;
+        fetch('/api/health').then(function (r) { return r.json(); }).then(function (d) {
+            if (d.error) return;
+            healthCards.forEach(function (card) {
+                var items = card.querySelectorAll('.gw-health-item');
+                var metrics = ['cpu', 'ram', 'disk'];
+                items.forEach(function (item, i) {
+                    var val = item.querySelector('.gw-health-value');
+                    if (val && d[metrics[i]] !== undefined) val.textContent = Math.round(d[metrics[i]]) + '%';
+                });
+            });
+        }).catch(function () {});
+    }
+    function updateGridWidgetWeather() {
+        var weatherCards = qsa('.grid-widget-card[data-widget-type="weather"]');
+        if (!weatherCards.length) return;
+        fetch('/api/weather').then(function (r) { return r.json(); }).then(function (d) {
+            if (d.error) return;
+            weatherCards.forEach(function (card) {
+                var temp = card.querySelector('.gw-temp');
+                if (temp) temp.textContent = Math.round(d.temperature) + '°C';
+                var ic = card.querySelector('.gw-weather i');
+                if (ic) ic.className = 'bi ' + weatherIcon(d.weather_code);
+            });
+        }).catch(function () {});
+    }
+    updateGridWidgetClocks();
+    setInterval(updateGridWidgetClocks, 1000);
+    updateGridWidgetHealth();
+    setInterval(updateGridWidgetHealth, 30000);
+    updateGridWidgetWeather();
+    setInterval(updateGridWidgetWeather, 1800000);
+
+    function loadGridWidgetCalendars() {
+        qsa('.grid-widget-card[data-widget-type="calendar"]').forEach(function(card) {
+            var eventsDiv = card.querySelector('.gw-calendar-events');
+            if (!eventsDiv) return;
+            api('GET', '/api/calendar/events')
+                .then(function (data) {
+                    if (!data.events || data.events.length === 0) {
+                        eventsDiv.innerHTML = '<div style="color:var(--fh-text-muted)">Aucun événement</div>';
+                        return;
+                    }
+                    eventsDiv.innerHTML = data.events.slice(0, 5).map(function (ev) {
+                        return '<div style="margin-top:4px;font-size:0.8rem"><strong>' + escHtml(ev.title || 'Sans titre') + '</strong><br><small>' + escHtml(ev.start || '') + '</small></div>';
+                    }).join('');
+                })
+                .catch(function () {
+                    eventsDiv.innerHTML = '<div style="color:var(--fh-text-muted)">Erreur</div>';
+                });
+        });
+    }
+    loadGridWidgetCalendars();
+    setInterval(loadGridWidgetCalendars, 300000);
 
     /* ══════════════════════════════════════
        GESTION DES PROFILS
@@ -1092,17 +1259,17 @@
 
                 eventsList.innerHTML = data.events.map(function (event) {
                     var html = '<div class="calendar-event">';
-                    html += '<div class="calendar-event-title">' + (event.title || 'Sans titre') + '</div>';
-                    html += '<div class="calendar-event-time">' + event.start + '</div>';
+                    html += '<div class="calendar-event-title">' + escHtml(event.title || 'Sans titre') + '</div>';
+                    html += '<div class="calendar-event-time">' + escHtml(event.start || '') + '</div>';
                     if (event.location) {
-                        html += '<div class="calendar-event-location"><i class="bi bi-geo-alt"></i> ' + event.location + '</div>';
+                        html += '<div class="calendar-event-location"><i class="bi bi-geo-alt"></i> ' + escHtml(event.location) + '</div>';
                     }
                     html += '</div>';
                     return html;
                 }).join('');
             })
             .catch(function (e) {
-                eventsList.innerHTML = '<div class="calendar-empty">Erreur: ' + e.message + '</div>';
+                eventsList.innerHTML = '<div class="calendar-empty">Erreur: ' + escHtml(e.message) + '</div>';
             });
     }
 
