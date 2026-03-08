@@ -63,23 +63,23 @@ def index():
     page_id = request.args.get('page', 1, type=int)
     groups = models.get_groups(page_id=page_id)
     widgets = {w['type']: w for w in models.get_widgets(profile_id)}
-    
-        # Parse camera URLs from settings
-        camera_urls = settings.get('camera_urls', '')
-        camera_streams = []
-        if camera_urls:
-            for line in camera_urls.strip().split('\n'):
-                line = line.strip()
-                if '|' in line:
-                    name, url = line.split('|', 1)
-                    camera_streams.append({'name': name.strip(), 'url': url.strip()})
-    
-        # Add camera streams to camera widget
-        if 'camera' not in widgets:
-            widgets['camera'] = {'type': 'camera', 'enabled': True, 'config': {}}
-        if not widgets['camera'].get('config'):
-            widgets['camera']['config'] = {}
-        widgets['camera']['config']['streams'] = camera_streams
+
+    # Parse camera URLs from settings
+    camera_urls = settings.get('camera_urls', '')
+    camera_streams = []
+    if camera_urls:
+        for line in camera_urls.strip().split('\n'):
+            line = line.strip()
+            if '|' in line:
+                name, url = line.split('|', 1)
+                camera_streams.append({'name': name.strip(), 'url': url.strip()})
+
+    # Add camera streams to camera widget
+    if 'camera' not in widgets:
+        widgets['camera'] = {'type': 'camera', 'enabled': True, 'config': {}}
+    if not widgets['camera'].get('config'):
+        widgets['camera']['config'] = {}
+    widgets['camera']['config']['streams'] = camera_streams
     
     services = models.get_services()
     profiles = models.get_profiles()
@@ -167,7 +167,8 @@ def api_update_settings():
         return jsonify(error='Données manquantes'), 400
     profile_id = get_current_profile_id()
     allowed = {'title', 'theme', 'background_url', 'greeting_name',
-               'search_provider', 'grid_cols', 'grid_rows'}
+               'search_provider', 'grid_cols', 'grid_rows',
+               'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls'}
     for k, v in data.items():
         if k in allowed:
             models.update_setting(k, str(v)[:500], profile_id)
@@ -471,7 +472,7 @@ def api_upload_background():
     name = 'background' + ext
     f.save(os.path.join(BG_DIR, name))
     bg_url = '/uploads/bg/' + name
-    models.update_setting('background_url', bg_url)
+    models.update_setting('background_url', bg_url, get_current_profile_id())
     return jsonify(url=bg_url), 201
 
 
@@ -481,14 +482,15 @@ def api_calendar_events():
     """Récupère les événements du calendrier Nextcloud via CalDAV."""
     if not CALDAV_AVAILABLE:
         return jsonify(error="caldav non installé"), 503
-    
+
     profile_id = get_current_profile_id()
-    
+
     # Récupérer les paramètres du calendrier depuis les settings
-    caldav_url = models.get_setting('caldav_url', profile_id) or ''
-    caldav_username = models.get_setting('caldav_username', profile_id) or ''
-    caldav_password = models.get_setting('caldav_password', profile_id) or ''
-    
+    settings = models.get_settings(profile_id)
+    caldav_url = settings.get('caldav_url', '') or ''
+    caldav_username = settings.get('caldav_username', '') or ''
+    caldav_password = settings.get('caldav_password', '') or ''
+
     if not all([caldav_url, caldav_username, caldav_password]):
         return jsonify(events=[], message="Configuration CalDAV manquante")
     
@@ -698,7 +700,8 @@ def _ping(url):
 
 @app.route('/api/weather')
 def api_weather():
-    widgets = {w['type']: w for w in models.get_widgets()}
+    profile_id = get_current_profile_id()
+    widgets = {w['type']: w for w in models.get_widgets(profile_id)}
     ww = widgets.get('weather')
     if not ww or not ww['enabled']:
         return jsonify(error='Widget météo désactivé'), 404

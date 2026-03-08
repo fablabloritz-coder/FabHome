@@ -26,6 +26,7 @@ Remplace avantageusement Homepage (gethomepage.dev) sans avoir à toucher du YAM
 
 ```bash
 cd ~/fabhome          # ou le dossier de votre choix
+cp .env.example .env  # une seule fois
 docker compose up -d --build
 ```
 
@@ -36,7 +37,16 @@ L'application est accessible à `http://<IP-SERVEUR>:3001`.
 ```bash
 cd ~/fabhome
 git pull --ff-only origin main
-docker compose up -d --build
+./deploy_safe.sh
+```
+
+Cette commande sécurise la MAJ: build, redemarrage, attente de healthcheck, logs automatiques en cas d'echec.
+
+Si le script n'est pas executable:
+
+```bash
+chmod +x deploy_safe.sh
+./deploy_safe.sh
 ```
 
 ### Arrêt / Relance / Redémarrage
@@ -102,6 +112,23 @@ docker compose ps              # Vérifier l'état du conteneur
 docker compose logs --tail=50  # Lire les logs
 curl http://localhost:3001/    # Tester localement
 ```
+
+### Port 3001 inaccessible après MAJ
+
+```bash
+cd ~/fabhome
+docker compose ps
+docker compose logs --tail=150 fabhome
+docker compose up -d --build fabhome
+docker compose ps
+```
+
+Points a verifier:
+- Le service doit etre `Up` et `healthy`.
+- Le mapping doit etre `3001->3000/tcp`.
+- Si besoin, forcer le port: `FABHOME_PORT=3001 docker compose up -d`.
+
+Sous Windows, une erreur `dockerDesktopLinuxEngine pipe not found` signifie que Docker Desktop n'est pas demarre.
 
 ### Conflit de nom de conteneur
 

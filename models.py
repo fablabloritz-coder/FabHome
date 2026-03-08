@@ -162,6 +162,10 @@ def init_db():
         'search_provider': 'google',
         'grid_cols': '4',
         'grid_rows': '3',
+        'caldav_url': '',
+        'caldav_username': '',
+        'caldav_password': '',
+        'camera_urls': '',
     }.items():
         conn.execute('INSERT OR IGNORE INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
 
@@ -216,6 +220,10 @@ def create_profile(name, icon='👤', color='#6c757d'):
         'search_provider': 'google',
         'grid_cols': '4',
         'grid_rows': '3',
+        'caldav_url': '',
+        'caldav_username': '',
+        'caldav_password': '',
+        'camera_urls': '',
     }.items():
         conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (?, ?, ?)',
                      (profile_id, k, v))
@@ -557,11 +565,11 @@ def import_all(data):
     conn.execute('DELETE FROM widgets')
 
     for k, v in data.get('settings', {}).items():
-        conn.execute('INSERT INTO settings (key, value) VALUES (?,?)', (k, v))
+        conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
 
     for p in data.get('pages', []):
-        conn.execute('INSERT INTO pages (id, name, icon, sort_order) VALUES (?,?,?,?)',
-                     (p['id'], p['name'], p.get('icon', 'bi-house'), p.get('sort_order', 0)))
+        conn.execute('INSERT INTO pages (id, profile_id, name, icon, sort_order) VALUES (?,?,?,?,?)',
+                     (p['id'], p.get('profile_id', 1), p['name'], p.get('icon', 'bi-house'), p.get('sort_order', 0)))
 
     for g in data.get('groups', []):
         conn.execute(
@@ -581,8 +589,8 @@ def import_all(data):
 
     for w in data.get('widgets', []):
         conn.execute(
-            'INSERT OR REPLACE INTO widgets (type, config, enabled, sort_order) VALUES (?,?,?,?)',
-            (w['type'], json.dumps(w.get('config', {})),
+            'INSERT OR REPLACE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
+            (w.get('profile_id', 1), w['type'], json.dumps(w.get('config', {})),
              w.get('enabled', 1), w.get('sort_order', 0)))
 
     for s in data.get('services', []):

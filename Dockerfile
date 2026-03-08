@@ -8,7 +8,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN mkdir -p data static/icons
 
-ENV FLASK_DEBUG=0
+# Fail fast during build if a Python file has syntax/indentation errors.
+RUN python -m py_compile app.py models.py
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    FLASK_DEBUG=0
 
 EXPOSE 3000
 
