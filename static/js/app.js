@@ -177,22 +177,13 @@
        ══════════════════════════════════════ */
 
     function updateClock() {
-        var t = qs('#clock-time'), d = qs('#clock-date');
+        var t = qs('#header-time'), d = qs('#header-date');
         if (!t) return;
         var now = new Date();
         t.textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         if (d) d.textContent = now.toLocaleDateString('fr-FR', {
             weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
         });
-    }
-
-    function updateGreeting() {
-        var el = qs('#greeting-text');
-        if (!el) return;
-        var h = new Date().getHours();
-        var g = h >= 5 && h < 12 ? 'Bonjour' : h < 18 ? "Bon apr\u00e8s-midi" : 'Bonsoir';
-        var name = PAGE_DATA.settings.greeting_name;
-        el.textContent = g + (name ? ', ' + name : '') + ' \uD83D\uDC4B';
     }
 
     function loadWeather() {
@@ -249,18 +240,13 @@
     }
 
     function loadHealth() {
-        var w = qs('#health-widget');
+        var w = qs('#health-widget-header');
         if (!w) return;
         fetch('/api/health').then(function (r) { return r.json(); }).then(function (d) {
             if (d.error) return;
             var metrics = ['cpu', 'ram', 'disk'];
             metrics.forEach(function (m) {
-                var fill = qs('#health-' + m);
-                var pct = qs('#health-' + m + '-pct');
-                if (fill) {
-                    fill.style.width = d[m] + '%';
-                    fill.className = 'health-fill' + (d[m] > 85 ? ' critical' : d[m] > 60 ? ' warning' : '');
-                }
+                var pct = qs('#health-' + m + '-pct-header');
                 if (pct) pct.textContent = Math.round(d[m]) + '%';
             });
         }).catch(function () {});
@@ -542,7 +528,6 @@
                 title: f.elements.title.value,
                 theme: f.elements.theme.value,
                 background_url: f.elements.background_url.value,
-                greeting_name: f.elements.greeting_name.value,
                 search_provider: f.elements.search_provider.value,
                 caldav_url: f.elements.caldav_url ? f.elements.caldav_url.value : '',
                 caldav_username: f.elements.caldav_username ? f.elements.caldav_username.value : '',
@@ -550,7 +535,7 @@
                 camera_urls: f.elements.camera_urls ? f.elements.camera_urls.value : ''
             };
             var widgetsBody = {
-                greeting: { enabled: f.elements.greeting_enabled.checked, config: {} },
+                greeting: { enabled: false, config: {} },
                 clock: { enabled: f.elements.clock_enabled.checked, config: {} },
                 search: { enabled: f.elements.search_enabled.checked, config: {} },
                 weather: {
@@ -562,7 +547,7 @@
                     }
                 },
                 health: { enabled: f.elements.health_enabled.checked, config: {} },
-                calendar: { enabled: f.elements.calendar_enabled ? f.elements.calendar_enabled.checked : false, config: {} },
+                calendar: { enabled: true, config: {} },
                 camera: { enabled: f.elements.camera_enabled ? f.elements.camera_enabled.checked : false, config: {} }
             };
             Promise.all([
@@ -1101,7 +1086,6 @@
     initModals();
     initExtraModals();
     updateClock();
-    updateGreeting();
     setInterval(updateClock, 1000);
     checkStatuses();
     setInterval(checkStatuses, 60000);
@@ -1112,53 +1096,6 @@
     loadServices();
 
     // ── Grid Widget live updates ──
-    function updateGridWidgetClocks() {
-        qsa('.grid-widget-card[data-widget-type="clock"]').forEach(function(card) {
-            var t = card.querySelector('.gw-clock-time');
-            var d = card.querySelector('.gw-clock-date');
-            if (!t) return;
-            var now = new Date();
-            t.textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            if (d) d.textContent = now.toLocaleDateString('fr-FR', {
-                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-            });
-        });
-    }
-    function updateGridWidgetHealth() {
-        var healthCards = qsa('.grid-widget-card[data-widget-type="health"]');
-        if (!healthCards.length) return;
-        fetch('/api/health').then(function (r) { return r.json(); }).then(function (d) {
-            if (d.error) return;
-            healthCards.forEach(function (card) {
-                var items = card.querySelectorAll('.gw-health-item');
-                var metrics = ['cpu', 'ram', 'disk'];
-                items.forEach(function (item, i) {
-                    var val = item.querySelector('.gw-health-value');
-                    if (val && d[metrics[i]] !== undefined) val.textContent = Math.round(d[metrics[i]]) + '%';
-                });
-            });
-        }).catch(function () {});
-    }
-    function updateGridWidgetWeather() {
-        var weatherCards = qsa('.grid-widget-card[data-widget-type="weather"]');
-        if (!weatherCards.length) return;
-        fetch('/api/weather').then(function (r) { return r.json(); }).then(function (d) {
-            if (d.error) return;
-            weatherCards.forEach(function (card) {
-                var temp = card.querySelector('.gw-temp');
-                if (temp) temp.textContent = Math.round(d.temperature) + '°C';
-                var ic = card.querySelector('.gw-weather i');
-                if (ic) ic.className = 'bi ' + weatherIcon(d.weather_code);
-            });
-        }).catch(function () {});
-    }
-    updateGridWidgetClocks();
-    setInterval(updateGridWidgetClocks, 1000);
-    updateGridWidgetHealth();
-    setInterval(updateGridWidgetHealth, 30000);
-    updateGridWidgetWeather();
-    setInterval(updateGridWidgetWeather, 1800000);
-
     function loadGridWidgetCalendars() {
         qsa('.grid-widget-card[data-widget-type="calendar"]').forEach(function(card) {
             var eventsDiv = card.querySelector('.gw-calendar-events');
@@ -1238,42 +1175,6 @@
     }
 
     /* ══════════════════════════════════════
-       WIDGET CALENDRIER
-       ══════════════════════════════════════ */
-
-    function loadCalendar() {
-        var calendarWidget = qs('.widget-calendar');
-        if (!calendarWidget) return;
-
-        var eventsList = qs('.calendar-events', calendarWidget);
-        if (!eventsList) return;
-
-        eventsList.innerHTML = '<div class="loading-text">Chargement...</div>';
-
-        api('GET', '/api/calendar/events')
-            .then(function (data) {
-                if (!data.events || data.events.length === 0) {
-                    eventsList.innerHTML = '<div class="calendar-empty">Aucun événement</div>';
-                    return;
-                }
-
-                eventsList.innerHTML = data.events.map(function (event) {
-                    var html = '<div class="calendar-event">';
-                    html += '<div class="calendar-event-title">' + escHtml(event.title || 'Sans titre') + '</div>';
-                    html += '<div class="calendar-event-time">' + escHtml(event.start || '') + '</div>';
-                    if (event.location) {
-                        html += '<div class="calendar-event-location"><i class="bi bi-geo-alt"></i> ' + escHtml(event.location) + '</div>';
-                    }
-                    html += '</div>';
-                    return html;
-                }).join('');
-            })
-            .catch(function (e) {
-                eventsList.innerHTML = '<div class="calendar-empty">Erreur: ' + escHtml(e.message) + '</div>';
-            });
-    }
-
-    /* ══════════════════════════════════════
        WIDGET CAMÉRAS
        ══════════════════════════════════════ */
 
@@ -1302,8 +1203,6 @@
        ══════════════════════════════════════ */
 
     initProfiles();
-    loadCalendar();
-    setInterval(loadCalendar, 300000); // Refresh every 5 minutes
     initCameras();
 
     if (PAGE_DATA.editOnLoad) {

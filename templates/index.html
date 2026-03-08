@@ -1,48 +1,84 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- ═══ SÉLECTEUR DE PROFIL ═══ -->
-<div class="profile-selector" id="profileSelector">
-    <button class="profile-btn" id="currentProfileBtn" title="Changer de profil">
-        <span class="profile-icon">{{ current_profile.icon if current_profile else '👤' }}</span>
-        <span class="profile-name">{{ current_profile.name if current_profile else 'Principal' }}</span>
-        <i class="bi bi-chevron-down"></i>
-    </button>
-    <div class="profile-dropdown hidden" id="profileDropdown">
-        {% for profile in profiles %}
-        <div class="profile-item {% if profile.id == current_profile.id %}active{% endif %}"
-             data-profile-id="{{ profile.id }}"
-             style="border-left: 3px solid {{ profile.color }};">
-            <span class="profile-icon">{{ profile.icon }}</span>
-            <span class="profile-name">{{ profile.name }}</span>
-            {% if profile.id == current_profile.id %}
-            <i class="bi bi-check-lg ms-auto"></i>
-            {% endif %}
-        </div>
-        {% endfor %}
-        <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.1);">
-        <div class="profile-item profile-add" data-action="add-profile">
-            <i class="bi bi-plus-circle"></i>
-            <span>Nouveau profil</span>
-        </div>
-        <div class="profile-item profile-manage" data-action="manage-profiles">
-            <i class="bi bi-gear"></i>
-            <span>Gérer les profils</span>
-        </div>
-    </div>
-</div>
-
 <!-- ═══ HEADER SYSTÈME ═══ -->
 <header class="system-header">
+    <!-- Profil + Logo -->
     <div class="system-header-left">
-        <h2 class="system-title">
+        <div class="header-profile" id="profileSelector">
+            <button class="header-profile-btn" id="currentProfileBtn" title="Changer de profil">
+                <span class="profile-icon">{{ current_profile.icon if current_profile else '👤' }}</span>
+                <span class="profile-name">{{ current_profile.name if current_profile else 'Principal' }}</span>
+                <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="profile-dropdown hidden" id="profileDropdown">
+                {% for profile in profiles %}
+                <div class="profile-item {% if profile.id == current_profile.id %}active{% endif %}"
+                     data-profile-id="{{ profile.id }}"
+                     style="border-left: 3px solid {{ profile.color }};">
+                    <span class="profile-icon">{{ profile.icon }}</span>
+                    <span class="profile-name">{{ profile.name }}</span>
+                    {% if profile.id == current_profile.id %}
+                    <i class="bi bi-check-lg ms-auto"></i>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.1);">
+                <div class="profile-item profile-add" data-action="add-profile">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>Nouveau profil</span>
+                </div>
+                <div class="profile-item profile-manage" data-action="manage-profiles">
+                    <i class="bi bi-gear"></i>
+                    <span>Gérer les profils</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-logo">
             <i class="bi bi-house-heart"></i>
-            {{ settings.title or "FabHome" }}
-        </h2>
+            <span>FabHome</span>
+        </div>
     </div>
-    
-    <div class="system-header-center">
-        {% if widgets.get('search') and widgets.search.enabled %}
+
+    <!-- Santé serveur -->
+    {% if widgets.get('health') and widgets.health.enabled %}
+    <div class="header-section header-health" id="health-widget-header">
+        <div class="health-item-compact" title="CPU">
+            <i class="bi bi-cpu"></i>
+            <small id="health-cpu-pct-header">--%</small>
+        </div>
+        <div class="health-item-compact" title="RAM">
+            <i class="bi bi-memory"></i>
+            <small id="health-ram-pct-header">--%</small>
+        </div>
+        <div class="health-item-compact" title="Disque">
+            <i class="bi bi-device-hdd"></i>
+            <small id="health-disk-pct-header">--%</small>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Date & Heure -->
+    {% if widgets.get('clock') and widgets.clock.enabled %}
+    <div class="header-section header-clock">
+        <span id="header-date" class="header-date"></span>
+        <span class="header-sep">·</span>
+        <span id="header-time" class="header-time"></span>
+    </div>
+    {% endif %}
+
+    <!-- Météo -->
+    {% if widgets.get('weather') and widgets.weather.enabled %}
+    <div class="header-section header-weather" id="weather-widget">
+        <i class="bi bi-cloud"></i>
+        <span id="weather-temp">--</span>°C
+        <small id="weather-city">{{ widgets.weather.config.get('city', '') }}</small>
+    </div>
+    {% endif %}
+
+    <!-- Recherche -->
+    {% if widgets.get('search') and widgets.search.enabled %}
+    <div class="header-section header-search">
         <form id="search-form" class="search-form-header">
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -50,87 +86,12 @@
                        placeholder="Rechercher sur le web…" autocomplete="off">
             </div>
         </form>
-        {% endif %}
     </div>
-    
-    <div class="system-header-right">
-        {% if widgets.get('health') and widgets.health.enabled %}
-        <div class="widget-health-compact" id="health-widget-header">
-            <div class="health-item-compact" title="CPU">
-                <i class="bi bi-cpu"></i>
-                <small id="health-cpu-pct-header">--%</small>
-            </div>
-            <div class="health-item-compact" title="RAM">
-                <i class="bi bi-memory"></i>
-                <small id="health-ram-pct-header">--%</small>
-            </div>
-            <div class="health-item-compact" title="Disque">
-                <i class="bi bi-device-hdd"></i>
-                <small id="health-disk-pct-header">--%</small>
-            </div>
-        </div>
-        {% endif %}
-    </div>
+    {% endif %}
 </header>
 
 <div class="homepage"
      {% if settings.background_url %}style="background-image: url('{{ settings.background_url }}');"{% endif %}>
-
-    <!-- ═══ ZONE WIDGETS (haut) ═══ -->
-    <div class="widgets-bar">
-        {% if widgets.get('greeting') and widgets.greeting.enabled %}
-        <div class="widget-greeting">
-            <h1 id="greeting-text"></h1>
-        </div>
-        {% endif %}
-
-        {% if widgets.get('clock') and widgets.clock.enabled %}
-        <div class="widget-clock">
-            <div id="clock-time" class="clock-time"></div>
-            <div id="clock-date" class="clock-date"></div>
-        </div>
-        {% endif %}
-
-        {% if widgets.get('weather') and widgets.weather.enabled %}
-        <div class="widget-weather" id="weather-widget">
-            <i class="bi bi-cloud"></i>
-            <span id="weather-temp">--</span>°C
-            <small id="weather-city">{{ widgets.weather.config.get('city', '') }}</small>
-        </div>
-        {% endif %}
-
-        {% if widgets.get('calendar') and widgets.calendar.enabled %}
-        <div class="widget-calendar" id="calendar-widget">
-            <div class="widget-cal-header">
-                <i class="bi bi-calendar3"></i>
-                <span>Événements</span>
-            </div>
-            <div class="calendar-events" id="calendar-events">
-                <div class="loading-text">Chargement...</div>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if widgets.get('camera') and widgets.camera.enabled %}
-        <div class="widget-camera" id="camera-widget">
-            <div class="widget-cam-header">
-                <i class="bi bi-camera-video"></i>
-                <span>Caméras</span>
-            </div>
-            <div class="camera-grid" id="camera-grid">
-                {% for stream in widgets.camera.config.get('streams', []) %}
-                <div class="camera-stream">
-                    <div class="camera-title">{{ stream.name }}</div>
-                    <img src="{{ stream.url }}" alt="{{ stream.name }}" class="camera-img" loading="lazy">
-                </div>
-                {% endfor %}
-                {% if not widgets.camera.config.get('streams') %}
-                <div class="camera-empty">Aucune caméra configurée</div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-    </div>
 
     <!-- ═══ ONGLETS PAGES ═══ -->
     {% if pages|length > 0 %}
@@ -545,9 +506,6 @@
                         <label class="form-label">Type de widget</label>
                         <select class="form-select" name="type" id="gridWidgetType" required>
                             <option value="">-- Choisir --</option>
-                            <option value="clock">⏰ Horloge</option>
-                            <option value="weather">🌤️ Météo</option>
-                            <option value="health">💻 Santé serveur</option>
                             <option value="note">📝 Note</option>
                             <option value="calendar">📅 Calendrier</option>
                             <option value="camera">📷 Caméra</option>
@@ -675,22 +633,11 @@
                             </div>
                         </div>
                         <div class="tab-pane fade" id="stWidgets">
-                            {% set wg = widgets.get('greeting', {}) %}
+                            <p class="text-muted mb-3 small">Widgets affichés dans le header. Désactivez ceux que vous ne souhaitez pas voir.</p>
                             {% set wc = widgets.get('clock', {}) %}
                             {% set ws = widgets.get('search', {}) %}
                             {% set ww = widgets.get('weather', {}) %}
                             {% set wwc = ww.config if ww and ww.config else {} %}
-                            <div class="settings-widget-row">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <strong><i class="bi bi-chat-quote"></i> Message d'accueil</strong>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="greeting_enabled"
-                                               {% if wg and wg.enabled %}checked{% endif %}>
-                                    </div>
-                                </div>
-                                <input type="text" class="form-control form-control-sm mt-2" name="greeting_name"
-                                       value="{{ settings.get('greeting_name', '') }}" placeholder="Votre prénom">
-                            </div>
                             <div class="settings-widget-row">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <strong><i class="bi bi-clock"></i> Horloge</strong>
@@ -699,6 +646,7 @@
                                                {% if wc and wc.enabled %}checked{% endif %}>
                                     </div>
                                 </div>
+                                <small class="form-text text-muted">Date et heure dans le header</small>
                             </div>
                             <div class="settings-widget-row">
                                 <div class="d-flex align-items-center justify-content-between">
@@ -750,15 +698,10 @@
                                 </div>
                                 <small class="form-text text-muted">CPU, RAM et disque du serveur</small>
                             </div>
-                            {% set wcal = widgets.get('calendar', {}) %}
+                            <hr>
+                            <p class="text-muted mb-3 small"><strong>Connexions</strong> — Paramètres utilisés par les widgets du dashboard.</p>
                             <div class="settings-widget-row">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <strong><i class="bi bi-calendar3"></i> Calendrier (Nextcloud)</strong>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="calendar_enabled"
-                                               {% if wcal and wcal.enabled %}checked{% endif %}>
-                                    </div>
-                                </div>
+                                <strong><i class="bi bi-calendar3"></i> Calendrier CalDAV</strong>
                                 <div class="row g-2 mt-1">
                                     <div class="col-12">
                                         <input type="text" class="form-control form-control-sm" name="caldav_url"
@@ -776,7 +719,7 @@
                                                placeholder="Mot de passe">
                                     </div>
                                 </div>
-                                <small class="form-text text-muted">Connexion CalDAV pour synchroniser vos événements</small>
+                                <small class="form-text text-muted">Connexion CalDAV — ajoutez un widget Calendrier sur le dashboard pour voir les événements</small>
                             </div>
                             {% set wcam = widgets.get('camera', {}) %}
                             <div class="settings-widget-row">
