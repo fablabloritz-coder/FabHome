@@ -912,6 +912,7 @@
 
     buildOccupiedMap();
     initModals();
+    initExtraModals();
     updateClock();
     updateGreeting();
     setInterval(updateClock, 1000);

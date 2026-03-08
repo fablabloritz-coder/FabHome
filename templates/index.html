@@ -64,7 +64,7 @@
     {% if pages|length > 1 or (request.args.get('edit')) %}
     <div class="page-tabs" id="pageTabs">
         {% for page in pages %}
-        <a href="/?page={{ page.id }}{% if request.args.get('edit') %}&edit=1{% endif %}"
+        <a href="/?page={{ page.id }}"
            class="page-tab{% if page.id == current_page %} active{% endif %}"
            data-page-id="{{ page.id }}">
             <i class="bi {{ page.icon }}"></i>
