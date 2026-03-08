@@ -328,6 +328,8 @@
             form.elements.icon.value = g ? g.icon : 'bi-folder';
             form.elements.col_span.value = g ? g.col_span : 1;
             form.elements.row_span.value = g ? (g.row_span || 1) : 1;
+            form.elements.icon_size.value = g ? (g.icon_size || 'medium') : 'medium';
+            form.elements.text_size.value = g ? (g.text_size || 'medium') : 'medium';
         } else {
             title.textContent = 'Nouveau groupe';
             delete form.dataset.editId;
@@ -335,6 +337,8 @@
             form.elements.icon.value = 'bi-folder';
             form.elements.col_span.value = '1';
             form.elements.row_span.value = '1';
+            form.elements.icon_size.value = 'medium';
+            form.elements.text_size.value = 'medium';
         }
         groupModal.show();
     }
@@ -349,6 +353,8 @@
                 icon: f.elements.icon.value,
                 col_span: parseInt(f.elements.col_span.value) || 1,
                 row_span: parseInt(f.elements.row_span.value) || 1,
+                icon_size: f.elements.icon_size.value,
+                text_size: f.elements.text_size.value,
                 page_id: PAGE_DATA.currentPage || 1
             };
             var eid = f.dataset.editId;
@@ -448,6 +454,9 @@
                     if (form.elements.weather_lat) form.elements.weather_lat.value = (existing.config || {}).latitude || '';
                     if (form.elements.weather_lon) form.elements.weather_lon.value = (existing.config || {}).longitude || '';
                 }
+                if (existing.type === 'service' && form.elements.service_id) {
+                    form.elements.service_id.value = (existing.config || {}).service_id || '';
+                }
                 form.elements.icon_size.value = existing.icon_size || 'medium';
                 form.elements.text_size.value = existing.text_size || 'medium';
                 qs('#gridWidgetColSpan').value = existing.col_span || 1;
@@ -472,6 +481,8 @@
             var type = this.value;
             qs('#widgetConfigNote').style.display = type === 'note' ? '' : 'none';
             qs('#widgetConfigWeather').style.display = type === 'weather' ? '' : 'none';
+            var svcCfg = qs('#widgetConfigService');
+            if (svcCfg) svcCfg.style.display = type === 'service' ? '' : 'none';
         });
     }
     
@@ -489,6 +500,8 @@
                 config.city = f.elements.weather_city.value;
                 config.latitude = parseFloat(f.elements.weather_lat.value) || 48.69;
                 config.longitude = parseFloat(f.elements.weather_lon.value) || 6.18;
+            } else if (type === 'service') {
+                config.service_id = parseInt(f.elements.service_id.value) || 0;
             }
             
             var body = {
@@ -1103,30 +1116,73 @@
             api('GET', '/api/calendar/events')
                 .then(function (data) {
                     if (!data.events || data.events.length === 0) {
-                        eventsDiv.innerHTML = '<div style="color:var(--fh-text-muted)">Aucun événement</div>';
+                        eventsDiv.innerHTML = '<div class="calendar-empty">Aucun événement à venir</div>';
                         return;
                     }
-                    eventsDiv.innerHTML = data.events.slice(0, 5).map(function (ev) {
-                        return '<div style="margin-top:4px;font-size:0.8rem"><strong>' + escHtml(ev.title || 'Sans titre') + '</strong><br><small>' + escHtml(ev.start || '') + '</small></div>';
+                    eventsDiv.innerHTML = data.events.slice(0, 8).map(function (ev) {
+                        var html = '<div class="calendar-event">';
+                        html += '<div class="calendar-event-title">' + escHtml(ev.title || 'Sans titre') + '</div>';
+                        if (ev.start) html += '<div class="calendar-event-time"><i class="bi bi-clock"></i> ' + escHtml(ev.start) + '</div>';
+                        if (ev.location) html += '<div class="calendar-event-location"><i class="bi bi-geo-alt"></i> ' + escHtml(ev.location) + '</div>';
+                        html += '</div>';
+                        return html;
                     }).join('');
                 })
                 .catch(function () {
-                    eventsDiv.innerHTML = '<div style="color:var(--fh-text-muted)">Erreur</div>';
+                    eventsDiv.innerHTML = '<div class="calendar-empty">Erreur de chargement</div>';
                 });
         });
     }
     loadGridWidgetCalendars();
     setInterval(loadGridWidgetCalendars, 300000);
 
+    // ── Grid Widget service live updates ──
+    function loadGridWidgetServices() {
+        qsa('.gw-service').forEach(function(el) {
+            var sid = parseInt(el.dataset.serviceId);
+            if (!sid) return;
+            var statusEl = el.querySelector('.gw-service-status');
+            var dataEl = el.querySelector('.gw-service-data');
+
+            fetch('/api/services/' + sid + '/proxy')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        if (statusEl) statusEl.textContent = '\u26A0\uFE0F';
+                        if (dataEl) dataEl.textContent = escHtml(data.error);
+                        return;
+                    }
+                    if (statusEl) statusEl.textContent = '\u2705';
+                    if (dataEl) {
+                        var card = el.closest('.grid-widget-card');
+                        var stype = '';
+                        if (card) {
+                            var gw = (PAGE_DATA.grid_widgets || []).find(function(w) { return w.id === parseInt(card.dataset.gridWidgetId); });
+                            if (gw) {
+                                var svc = (PAGE_DATA.services || []).find(function(s) { return s.id === sid; });
+                                stype = svc ? svc.type : '';
+                            }
+                        }
+                        renderServiceData(dataEl, stype, data);
+                    }
+                })
+                .catch(function() {
+                    if (statusEl) statusEl.textContent = '\u274C';
+                });
+        });
+    }
+    loadGridWidgetServices();
+    setInterval(loadGridWidgetServices, 30000);
+
     /* ══════════════════════════════════════
        GESTION DES PROFILS
        ══════════════════════════════════════ */
 
     function initProfiles() {
-        var profileSelector = qs('.profile-selector');
+        var profileSelector = qs('.header-profile');
         if (!profileSelector) return;
 
-        var profileBtn = qs('.profile-btn', profileSelector);
+        var profileBtn = qs('.header-profile-btn', profileSelector);
         var profileDropdown = qs('.profile-dropdown', profileSelector);
 
         // Toggle dropdown

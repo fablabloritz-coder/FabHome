@@ -201,7 +201,9 @@ def api_create_group():
         int(data.get('row_span', 1)),
         int(data.get('grid_row', -1)),
         int(data.get('grid_col', 0)),
-        page_id=int(data.get('page_id', 1)))
+        page_id=int(data.get('page_id', 1)),
+        icon_size=(data.get('icon_size') or 'medium')[:10],
+        text_size=(data.get('text_size') or 'medium')[:10])
     return jsonify(id=gid), 201
 
 
@@ -217,7 +219,9 @@ def api_update_group(gid):
         col_span=int(data['col_span']) if 'col_span' in data else None,
         row_span=int(data['row_span']) if 'row_span' in data else None,
         grid_row=int(data['grid_row']) if 'grid_row' in data else None,
-        grid_col=int(data['grid_col']) if 'grid_col' in data else None)
+        grid_col=int(data['grid_col']) if 'grid_col' in data else None,
+        icon_size=(data['icon_size'])[:10] if 'icon_size' in data else None,
+        text_size=(data['text_size'])[:10] if 'text_size' in data else None)
     return jsonify(ok=True)
 
 
@@ -702,56 +706,107 @@ def api_favicon():
         domain = parsed.hostname
         if not domain:
             return jsonify(error='Domaine invalide'), 400
-        
-        # Stratégie multi-niveaux pour récupérer le meilleur favicon
-        # 1. Essayer /favicon.ico direct
-        favicon_url = f"{parsed.scheme}://{domain}/favicon.ico"
+
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        base = f"{parsed.scheme}://{domain}"
+
+        # 1. Parser la page HTML pour trouver la meilleure icône
         try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
+            page_url = url if '://' in url else 'https://' + url
+            req = Request(page_url)
+            for k, v in headers.items():
+                req.add_header(k, v)
+            response = urlopen(req, timeout=5, context=ctx)
+            html = response.read(100000).decode('utf-8', errors='ignore')
+
+            import re
+            best_icon = None
+            best_size = 0
+
+            # Chercher toutes les balises <link> avec rel icon/shortcut/apple-touch
+            link_tags = re.findall(r'<link\s+[^>]*?>', html, re.IGNORECASE | re.DOTALL)
+            for tag in link_tags:
+                rel_match = re.search(r'rel=["\']([^"\']*)["\']', tag, re.IGNORECASE)
+                if not rel_match:
+                    continue
+                rel = rel_match.group(1).lower()
+                if 'icon' not in rel and 'apple-touch' not in rel:
+                    continue
+                href_match = re.search(r'href=["\']([^"\']*)["\']', tag, re.IGNORECASE)
+                if not href_match:
+                    continue
+                href = href_match.group(1).strip()
+                if not href or href.startswith('data:'):
+                    continue
+
+                # Déterminer la taille
+                size = 0
+                sizes_match = re.search(r'sizes=["\'](\d+)x\d+["\']', tag, re.IGNORECASE)
+                if sizes_match:
+                    size = int(sizes_match.group(1))
+                elif 'apple-touch' in rel:
+                    size = 180
+                elif href.endswith('.svg'):
+                    size = 512
+
+                # Construire l'URL complète
+                if href.startswith('http'):
+                    full_url = href
+                elif href.startswith('//'):
+                    full_url = f"{parsed.scheme}:{href}"
+                elif href.startswith('/'):
+                    full_url = f"{base}{href}"
+                else:
+                    full_url = f"{base}/{href}"
+
+                if size > best_size or best_icon is None:
+                    best_icon = full_url
+                    best_size = size
+
+            # Chercher og:image comme fallback enrichi
+            if not best_icon or best_size < 64:
+                og_match = re.search(r'<meta\s+[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+                if not og_match:
+                    og_match = re.search(r'<meta\s+[^>]*content=["\']([^"\']+)["\'][^>]*property=["\']og:image["\']', html, re.IGNORECASE)
+
+            if best_icon:
+                return jsonify(icon=best_icon)
+
+        except Exception:
+            pass
+
+        # 2. Essayer /favicon.ico direct
+        try:
+            favicon_url = f"{base}/favicon.ico"
             req = Request(favicon_url)
-            req.add_header('User-Agent', 'Mozilla/5.0 FabHome/1.0')
+            for k, v in headers.items():
+                req.add_header(k, v)
             response = urlopen(req, timeout=3, context=ctx)
             if response.getcode() == 200:
-                return jsonify(icon=favicon_url)
+                ct = response.headers.get('Content-Type', '')
+                if 'image' in ct or 'octet' in ct or ct == '':
+                    return jsonify(icon=favicon_url)
         except Exception:
             pass
-        
-        # 2. Essayer de parser la page HTML pour trouver l'icône
+
+        # 3. Essayer /apple-touch-icon.png
         try:
-            req = Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0 FabHome/1.0')
+            apple_url = f"{base}/apple-touch-icon.png"
+            req = Request(apple_url)
+            for k, v in headers.items():
+                req.add_header(k, v)
             response = urlopen(req, timeout=3, context=ctx)
-            html = response.read(50000).decode('utf-8', errors='ignore')
-            
-            # Chercher les balises link avec rel="icon" ou rel="shortcut icon"
-            import re
-            # Chercher <link rel="icon" href="..."> ou similaire
-            patterns = [
-                r'<link[^>]*rel=["\'](?:shortcut )?icon["\'][^>]*href=["\'](.*?)["\']',
-                r'<link[^>]*href=["\'](.*?)["\'][^>]*rel=["\'](?:shortcut )?icon["\']',
-            ]
-            
-            for pattern in patterns:
-                matches = re.findall(pattern, html, re.IGNORECASE)
-                if matches:
-                    icon_path = matches[0]
-                    # Construire l'URL complète
-                    if icon_path.startswith('http'):
-                        return jsonify(icon=icon_path)
-                    elif icon_path.startswith('//'):
-                        return jsonify(icon=f"{parsed.scheme}:{icon_path}")
-                    elif icon_path.startswith('/'):
-                        return jsonify(icon=f"{parsed.scheme}://{domain}{icon_path}")
-                    else:
-                        return jsonify(icon=f"{parsed.scheme}://{domain}/{icon_path}")
+            if response.getcode() == 200:
+                return jsonify(icon=apple_url)
         except Exception:
             pass
-        
-        # 3. Fallback: Google favicon service (plus fiable pour la plupart des sites)
+
+        # 4. Fallback: Google favicon service
         return jsonify(icon=f'https://www.google.com/s2/favicons?domain={domain}&sz=64')
-        
+
     except Exception as e:
         logger.debug(f"Erreur récupération favicon: {e}")
         return jsonify(error='Erreur'), 400

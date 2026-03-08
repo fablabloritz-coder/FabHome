@@ -962,6 +962,28 @@ body.edit-mode .group-card {
 .grid-widget-card.size-text-small { font-size: 0.8rem; }
 .grid-widget-card.size-text-medium { font-size: 0.95rem; }
 .grid-widget-card.size-text-large { font-size: 1.15rem; }
+
+.group-card.size-icon-small .link-icon i,
+.group-card.size-icon-small .link-icon img,
+.group-card.size-icon-small .group-icon-img,
+.group-card.size-icon-small .group-icon-emoji { font-size: 1rem; width: 1rem; height: 1rem; }
+.group-card.size-icon-medium .link-icon i,
+.group-card.size-icon-medium .link-icon img,
+.group-card.size-icon-medium .group-icon-img,
+.group-card.size-icon-medium .group-icon-emoji { font-size: 1.5rem; width: 1.5rem; height: 1.5rem; }
+.group-card.size-icon-large .link-icon i,
+.group-card.size-icon-large .link-icon img,
+.group-card.size-icon-large .group-icon-img,
+.group-card.size-icon-large .group-icon-emoji { font-size: 2.2rem; width: 2.2rem; height: 2.2rem; }
+.group-card.size-text-small .link-name { font-size: 0.75rem; }
+.group-card.size-text-small .link-desc { font-size: 0.65rem; }
+.group-card.size-text-small .group-header { font-size: 0.7rem; }
+.group-card.size-text-medium .link-name { font-size: 0.88rem; }
+.group-card.size-text-medium .link-desc { font-size: 0.75rem; }
+.group-card.size-text-medium .group-header { font-size: 0.8rem; }
+.group-card.size-text-large .link-name { font-size: 1.05rem; }
+.group-card.size-text-large .link-desc { font-size: 0.88rem; }
+.group-card.size-text-large .group-header { font-size: 0.95rem; }
 .gw-card-body { width: 100%; text-align: center; color: var(--fh-text); }
 .gw-clock .gw-clock-time { font-size: 2rem; font-weight: 600; color: var(--fh-text); }
 .gw-clock .gw-clock-date { font-size: 0.8rem; color: var(--fh-text-muted); margin-top: 4px; }
@@ -973,9 +995,36 @@ body.edit-mode .group-card {
 .gw-health-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 .gw-health-item i { font-size: 1.1rem; color: var(--fh-accent); }
 .gw-health-value { font-weight: 600; color: var(--fh-text); }
-.gw-calendar { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.gw-calendar i { font-size: 1.8rem; color: var(--fh-accent); }
-.gw-calendar-events { font-size: 0.8rem; color: var(--fh-text-muted); width: 100%; }
+.gw-calendar { display: flex; flex-direction: column; width: 100%; overflow: auto; }
+.gw-calendar .widget-cal-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600; margin-bottom: 10px; color: var(--fh-text);
+}
+.gw-calendar .widget-cal-header i { font-size: 18px; color: var(--fh-accent); }
+.gw-calendar .calendar-events { display: flex; flex-direction: column; gap: 6px; }
+.gw-calendar .calendar-event {
+    background: rgba(255,255,255,0.05);
+    border-left: 3px solid var(--fh-accent);
+    padding: 6px 10px; border-radius: 4px; transition: background 0.2s;
+}
+.gw-calendar .calendar-event:hover { background: rgba(255,255,255,0.08); }
+.gw-calendar .calendar-event-title { font-weight: 500; font-size: 13px; margin-bottom: 2px; }
+.gw-calendar .calendar-event-time { font-size: 11px; color: var(--fh-text-muted); }
+.gw-calendar .calendar-event-time i,
+.gw-calendar .calendar-event-location i { font-size: 10px; margin-right: 3px; }
+.gw-calendar .calendar-event-location { font-size: 10px; color: var(--fh-text-muted); margin-top: 1px; }
+.gw-calendar .calendar-empty { text-align: center; color: var(--fh-text-muted); font-size: 12px; padding: 16px; }
+
+.gw-service { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.gw-service-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.82rem; font-weight: 600; color: var(--fh-text-muted);
+}
+.gw-service-status { margin-left: auto; font-size: 0.75rem; }
+.gw-service-data {
+    font-size: 0.78rem; color: var(--fh-text);
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
 .gw-camera { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .gw-camera i { font-size: 1.8rem; color: var(--fh-accent); }
 .gw-generic { display: flex; align-items: center; gap: 10px; justify-content: center; color: var(--fh-text-muted); }

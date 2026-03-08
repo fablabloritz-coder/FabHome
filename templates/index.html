@@ -118,7 +118,7 @@
              style="--grid-cols: {{ settings.get('grid_cols', '4') }}; --grid-rows: {{ settings.get('grid_rows', '3') }};">
 
             {% for group in groups if group.grid_row >= 0 %}
-            <div class="group-card"
+            <div class="group-card size-icon-{{ group.icon_size or 'medium' }} size-text-{{ group.text_size or 'medium' }}"
                  data-group-id="{{ group.id }}"
                  draggable="false"
                  style="grid-column: {{ group.grid_col + 1 }} / span {{ group.col_span }}; grid-row: {{ group.grid_row + 1 }} / span {{ group.row_span }};">
@@ -220,15 +220,28 @@
                 </div>
                 {% elif gw.type == 'calendar' %}
                 <div class="gw-card-body gw-calendar">
-                    <i class="bi bi-calendar3"></i>
-                    <span>Calendrier</span>
-                    <div class="gw-calendar-events"></div>
+                    <div class="widget-cal-header">
+                        <i class="bi bi-calendar3"></i>
+                        <span>Calendrier</span>
+                    </div>
+                    <div class="calendar-events gw-calendar-events"></div>
                 </div>
                 {% elif gw.type == 'camera' %}
                 <div class="gw-card-body gw-camera">
                     <i class="bi bi-camera-video"></i>
                     <span>Caméra</span>
                     <div class="gw-camera-feed"></div>
+                </div>
+                {% elif gw.type == 'service' %}
+                {% set svc_id = gw.config.get('service_id', 0)|int %}
+                {% set svc_match = services|selectattr('id', 'equalto', svc_id)|list %}
+                <div class="gw-card-body gw-service" data-service-id="{{ svc_id }}">
+                    <div class="gw-service-header">
+                        <i class="bi bi-plug"></i>
+                        <span>{{ svc_match[0].name if svc_match else 'Service' }}</span>
+                        <span class="gw-service-status">…</span>
+                    </div>
+                    <div class="gw-service-data"></div>
                 </div>
                 {% else %}
                 <div class="gw-card-body gw-generic">
@@ -403,6 +416,24 @@
                             </select>
                         </div>
                     </div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <label class="form-label">Taille des icônes</label>
+                            <select class="form-select" name="icon_size">
+                                <option value="small">Petit</option>
+                                <option value="medium" selected>Moyen</option>
+                                <option value="large">Grand</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Taille du texte</label>
+                            <select class="form-select" name="text_size">
+                                <option value="small">Petit</option>
+                                <option value="medium" selected>Moyen</option>
+                                <option value="large">Grand</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
@@ -509,6 +540,7 @@
                             <option value="note">📝 Note</option>
                             <option value="calendar">📅 Calendrier</option>
                             <option value="camera">📷 Caméra</option>
+                            <option value="service">🔌 Service</option>
                         </select>
                     </div>
                     
@@ -530,6 +562,17 @@
                                 <input type="number" step="0.01" class="form-control" name="weather_lon">
                             </div>
                         </div>
+                    </div>
+                    
+                    <div class="mb-3" id="widgetConfigService" style="display: none;">
+                        <label class="form-label">Service à afficher</label>
+                        <select class="form-select" name="service_id" id="gridWidgetServiceId">
+                            <option value="">-- Choisir un service --</option>
+                            {% for svc in services %}
+                            <option value="{{ svc.id }}">{{ svc.name }} ({{ svc.type }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Ajoutez vos services dans Réglages > Services</small>
                     </div>
                     
                     <hr>

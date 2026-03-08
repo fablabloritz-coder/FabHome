@@ -159,6 +159,11 @@ def init_db():
             conn.execute('UPDATE groups_ SET grid_row=?, grid_col=? WHERE id=?',
                          (r, c, row[0]))
 
+    if 'icon_size' not in cols:
+        conn.execute("ALTER TABLE groups_ ADD COLUMN icon_size TEXT NOT NULL DEFAULT 'medium'")
+    if 'text_size' not in cols:
+        conn.execute("ALTER TABLE groups_ ADD COLUMN text_size TEXT NOT NULL DEFAULT 'medium'")
+
     # Migration group_widgets : old schema had group_id, new schema has page_id + grid columns
     gw_cols = [r[1] for r in conn.execute("PRAGMA table_info(group_widgets)").fetchall()]
     if gw_cols and 'group_id' in gw_cols and 'page_id' not in gw_cols:
@@ -409,13 +414,14 @@ def get_groups(page_id=None):
 
 
 def create_group(name, icon='bi-folder', col_span=1, row_span=1,
-                 grid_row=-1, grid_col=0, page_id=1):
+                 grid_row=-1, grid_col=0, page_id=1,
+                 icon_size='medium', text_size='medium'):
     conn = get_db()
     cur = conn.execute(
-        'INSERT INTO groups_ (name, icon, col_span, row_span, grid_row, grid_col, sort_order, page_id) '
-        'VALUES (?,?,?,?,?,?,0,?)',
+        'INSERT INTO groups_ (name, icon, col_span, row_span, grid_row, grid_col, sort_order, page_id, icon_size, text_size) '
+        'VALUES (?,?,?,?,?,?,0,?,?,?)',
         (name, icon, max(1, min(4, col_span)), max(1, min(4, row_span)),
-         grid_row, grid_col, page_id))
+         grid_row, grid_col, page_id, icon_size, text_size))
     gid = cur.lastrowid
     conn.commit()
     conn.close()
@@ -423,7 +429,8 @@ def create_group(name, icon='bi-folder', col_span=1, row_span=1,
 
 
 def update_group(gid, name, icon, col_span=None, row_span=None,
-                 grid_row=None, grid_col=None, page_id=None):
+                 grid_row=None, grid_col=None, page_id=None,
+                 icon_size=None, text_size=None):
     conn = get_db()
     fields = ['name=?', 'icon=?']
     params = [name, icon]
@@ -442,6 +449,12 @@ def update_group(gid, name, icon, col_span=None, row_span=None,
     if page_id is not None:
         fields.append('page_id=?')
         params.append(page_id)
+    if icon_size is not None:
+        fields.append('icon_size=?')
+        params.append(icon_size)
+    if text_size is not None:
+        fields.append('text_size=?')
+        params.append(text_size)
     params.append(gid)
     conn.execute('UPDATE groups_ SET ' + ','.join(fields) + ' WHERE id=?', params)
     conn.commit()
