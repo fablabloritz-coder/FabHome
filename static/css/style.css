@@ -1,0 +1,356 @@
+/* FabHome — Styles globaux */
+
+:root {
+    --fh-accent: #ff6b35;
+}
+
+/* ── Thème sombre ─────────────────────── */
+[data-bs-theme="dark"] {
+    --fh-bg: #0f0f1a;
+    --fh-bg-gradient: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+    --fh-card-bg: rgba(255,255,255,0.05);
+    --fh-card-border: rgba(255,255,255,0.08);
+    --fh-text: #e0e0e0;
+    --fh-text-muted: #888;
+    --fh-search-bg: rgba(255,255,255,0.08);
+}
+
+/* ── Thème clair ──────────────────────── */
+[data-bs-theme="light"] {
+    --fh-bg: #f0f2f5;
+    --fh-bg-gradient: linear-gradient(135deg, #f0f2f5 0%, #e8eaf0 100%);
+    --fh-card-bg: #ffffff;
+    --fh-card-border: rgba(0,0,0,0.08);
+    --fh-text: #333;
+    --fh-text-muted: #777;
+    --fh-search-bg: #ffffff;
+}
+
+/* ── Base ─────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 0;
+}
+
+/* ══════════════════════════════════════════
+   PAGE D'ACCUEIL
+   ══════════════════════════════════════════ */
+
+.homepage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1.5rem 4rem;
+    background: var(--fh-bg-gradient);
+    background-color: var(--fh-bg);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: var(--fh-text);
+}
+
+/* ── Zone widgets ─────────────────────── */
+.widgets-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    width: 100%;
+    max-width: 800px;
+}
+
+.widget-greeting h1 {
+    font-size: 2rem;
+    font-weight: 300;
+    text-align: center;
+    margin: 0;
+}
+
+.widget-clock {
+    text-align: center;
+}
+
+.clock-time {
+    font-size: 3.5rem;
+    font-weight: 200;
+    letter-spacing: 3px;
+    line-height: 1.1;
+}
+
+.clock-date {
+    font-size: 1rem;
+    color: var(--fh-text-muted);
+    text-transform: capitalize;
+}
+
+.widget-weather {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    color: var(--fh-text-muted);
+    background: var(--fh-card-bg);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    border: 1px solid var(--fh-card-border);
+}
+
+.widget-weather i {
+    font-size: 1.3rem;
+}
+
+/* ── Barre de recherche ───────────────── */
+.search-bar {
+    width: 100%;
+    max-width: 600px;
+    margin-bottom: 2.5rem;
+}
+
+.search-form .input-group {
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.search-form .input-group-text {
+    background: var(--fh-search-bg);
+    border: 1px solid var(--fh-card-border);
+    border-right: none;
+    color: var(--fh-text-muted);
+    padding: 0.7rem 1rem;
+}
+
+.search-form .form-control {
+    background: var(--fh-search-bg);
+    border: 1px solid var(--fh-card-border);
+    border-left: none;
+    color: var(--fh-text);
+    padding: 0.7rem 1rem;
+    font-size: 1.05rem;
+}
+
+.search-form .form-control:focus {
+    box-shadow: none;
+    border-color: var(--fh-accent);
+}
+
+.search-form .form-control::placeholder {
+    color: var(--fh-text-muted);
+}
+
+/* ── Grille de groupes ────────────────── */
+.groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 1200px;
+}
+
+.group-card {
+    background: var(--fh-card-bg);
+    border: 1px solid var(--fh-card-border);
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.group-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+}
+
+.group-header {
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--fh-text-muted);
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--fh-card-border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.group-icon-img {
+    width: 1rem;
+    height: 1rem;
+    object-fit: contain;
+}
+
+/* ── Items de lien ────────────────────── */
+.group-links {
+    display: flex;
+    flex-direction: column;
+}
+
+.link-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.5rem;
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--fh-text);
+    transition: background 0.15s;
+}
+
+.link-item:hover {
+    background: rgba(255, 107, 53, 0.08);
+    color: var(--fh-text);
+}
+
+.link-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(255, 107, 53, 0.1);
+    font-size: 1.15rem;
+    color: var(--fh-accent);
+    flex-shrink: 0;
+}
+
+.link-icon img {
+    width: 1.4rem;
+    height: 1.4rem;
+    object-fit: contain;
+}
+
+.link-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.link-name {
+    font-weight: 500;
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.link-desc {
+    font-size: 0.75rem;
+    color: var(--fh-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Pastilles de statut ──────────────── */
+.status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #555;
+    flex-shrink: 0;
+    margin-left: auto;
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+.status-dot.up {
+    background: #06d6a0;
+    box-shadow: 0 0 8px rgba(6, 214, 160, 0.5);
+}
+
+.status-dot.down {
+    background: #ef476f;
+    box-shadow: 0 0 8px rgba(239, 71, 111, 0.5);
+}
+
+/* ── État vide ────────────────────────── */
+.empty-state {
+    text-align: center;
+    color: var(--fh-text-muted);
+    padding: 4rem 1rem;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.empty-state a {
+    color: var(--fh-accent);
+}
+
+/* ── Bouton admin flottant ────────────── */
+.admin-fab {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--fh-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    text-decoration: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    z-index: 100;
+    opacity: 0.7;
+}
+
+.admin-fab:hover {
+    transform: scale(1.1);
+    opacity: 1;
+    color: #fff;
+    box-shadow: 0 6px 24px rgba(255, 107, 53, 0.4);
+}
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .homepage {
+        padding: 1.5rem 1rem 3rem;
+    }
+
+    .widget-greeting h1 {
+        font-size: 1.4rem;
+    }
+
+    .clock-time {
+        font-size: 2.5rem;
+    }
+
+    .groups-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .search-bar {
+        margin-bottom: 1.5rem;
+    }
+
+    .admin-fab {
+        width: 42px;
+        height: 42px;
+        font-size: 1.1rem;
+        bottom: 1rem;
+        right: 1rem;
+    }
+}
+
+@media (min-width: 1400px) {
+    .groups-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}

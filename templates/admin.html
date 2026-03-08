@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .admin-container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    .group-admin-card {
+        border: 1px solid var(--bs-border-color);
+        border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+    }
+    .link-row {
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.5rem 0.75rem; border-radius: 8px;
+    }
+    .link-row:hover { background: var(--bs-tertiary-bg); }
+    .icon-preview { font-size: 1.2rem; width: 2rem; text-align: center; flex-shrink: 0; }
+    .icon-preview img { width: 1.2rem; height: 1.2rem; object-fit: contain; }
+    .widget-card {
+        border: 1px solid var(--bs-border-color);
+        border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+    }
+    .icon-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.5rem; }
+    .icon-pick {
+        width: 36px; height: 36px; display: flex; align-items: center;
+        justify-content: center; font-size: 1.1rem; cursor: pointer;
+        border: 1px solid var(--bs-border-color); border-radius: 6px;
+        background: var(--bs-tertiary-bg); transition: all 0.15s;
+    }
+    .icon-pick:hover { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0"><i class="bi bi-gear"></i> Administration</h3>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Retour à l'accueil
+        </a>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-groups">
+                <i class="bi bi-collection"></i> Groupes &amp; Liens
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-widgets">
+                <i class="bi bi-puzzle"></i> Widgets
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-appearance">
+                <i class="bi bi-palette"></i> Apparence
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- ═══ ONGLET GROUPES & LIENS ═══ -->
+        <div class="tab-pane fade show active" id="tab-groups">
+            <button class="btn btn-primary mb-3" data-action="new-group">
+                <i class="bi bi-plus-lg"></i> Nouveau Groupe
+            </button>
+
+            {% for group in groups %}
+            <div class="group-admin-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">
+                        <span class="icon-preview d-inline-block">
+                            {% if group.icon.startswith('http') %}
+                            <img src="{{ group.icon }}" alt="">
+                            {% elif group.icon|length <= 2 %}
+                            {{ group.icon }}
+                            {% else %}
+                            <i class="bi {{ group.icon }}"></i>
+                            {% endif %}
+                        </span>
+                        {{ group.name }}
+                    </h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" data-action="move-group"
+                                data-id="{{ group.id }}" data-dir="-1" title="Monter">
+                            <i class="bi bi-arrow-up"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" data-action="move-group"
+                                data-id="{{ group.id }}" data-dir="1" title="Descendre">
+                            <i class="bi bi-arrow-down"></i>
+                        </button>
+                        <button class="btn btn-outline-primary" data-action="edit-group"
+                                data-id="{{ group.id }}"
+                                data-name="{{ group.name }}" data-icon="{{ group.icon }}" title="Modifier">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" data-action="delete-group"
+                                data-id="{{ group.id }}" data-name="{{ group.name }}" title="Supprimer">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                {% for link in group.links %}
+                <div class="link-row">
+                    <span class="icon-preview">
+                        {% if link.icon.startswith('http') %}
+                        <img src="{{ link.icon }}" alt="">
+                        {% elif link.icon|length <= 2 %}
+                        {{ link.icon }}
+                        {% else %}
+                        <i class="bi {{ link.icon }}"></i>
+                        {% endif %}
+                    </span>
+                    <div class="flex-grow-1 overflow-hidden">
+                        <strong>{{ link.name }}</strong>
+                        <br><small class="text-muted text-truncate d-block">{{ link.url }}</small>
+                    </div>
+                    {% if link.check_status %}
+                    <span class="badge bg-info" title="Surveillance de statut"><i class="bi bi-activity"></i></span>
+                    {% endif %}
+                    <div class="btn-group btn-group-sm flex-shrink-0">
+                        <button class="btn btn-outline-secondary" data-action="move-link"
+                                data-id="{{ link.id }}" data-dir="-1"><i class="bi bi-arrow-up"></i></button>
+                        <button class="btn btn-outline-secondary" data-action="move-link"
+                                data-id="{{ link.id }}" data-dir="1"><i class="bi bi-arrow-down"></i></button>
+                        <button class="btn btn-outline-primary" data-action="edit-link"
+                                data-id="{{ link.id }}" data-group-id="{{ group.id }}"
+                                data-name="{{ link.name }}" data-url="{{ link.url }}"
+                                data-icon="{{ link.icon }}" data-description="{{ link.description }}"
+                                data-check-status="{{ link.check_status }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" data-action="delete-link"
+                                data-id="{{ link.id }}" data-name="{{ link.name }}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <button class="btn btn-sm btn-outline-primary mt-2" data-action="new-link"
+                        data-group-id="{{ group.id }}">
+                    <i class="bi bi-plus"></i> Ajouter un lien
+                </button>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-collection" style="font-size: 3rem;"></i>
+                <p class="mt-2">Aucun groupe créé. Commencez par ajouter un groupe !</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ═══ ONGLET WIDGETS ═══ -->
+        <div class="tab-pane fade" id="tab-widgets">
+            <form id="widgetsForm">
+                <!-- Message d'accueil -->
+                <div class="widget-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="bi bi-chat-quote"></i> Message d'accueil</h6>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="greeting_enabled"
+                                   {% if widgets.get('greeting') and widgets.greeting.enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Votre prénom</label>
+                        <input type="text" class="form-control form-control-sm" name="greeting_name"
+                               value="{{ settings.get('greeting_name', '') }}" placeholder="Ex: Steven">
+                    </div>
+                </div>
+
+                <!-- Horloge -->
+                <div class="widget-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-clock"></i> Horloge</h6>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="clock_enabled"
+                                   {% if widgets.get('clock') and widgets.clock.enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recherche -->
+                <div class="widget-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="bi bi-search"></i> Barre de recherche</h6>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="search_enabled"
+                                   {% if widgets.get('search') and widgets.search.enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Moteur de recherche</label>
+                        <select class="form-select form-select-sm" name="search_provider">
+                            {% set sp = settings.get('search_provider', 'google') %}
+                            <option value="google" {% if sp == 'google' %}selected{% endif %}>Google</option>
+                            <option value="duckduckgo" {% if sp == 'duckduckgo' %}selected{% endif %}>DuckDuckGo</option>
+                            <option value="bing" {% if sp == 'bing' %}selected{% endif %}>Bing</option>
+                            <option value="startpage" {% if sp == 'startpage' %}selected{% endif %}>Startpage</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Météo -->
+                <div class="widget-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="bi bi-cloud-sun"></i> Météo</h6>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="weather_enabled"
+                                   {% if widgets.get('weather') and widgets.weather.enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                    {% set wc = widgets.get('weather', {}) %}
+                    {% set wcfg = wc.config if wc and wc.config else {} %}
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small">Ville</label>
+                            <input type="text" class="form-control form-control-sm" name="weather_city"
+                                   value="{{ wcfg.get('city', 'Nancy') }}" placeholder="Nancy">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Latitude</label>
+                            <input type="number" class="form-control form-control-sm" name="weather_lat"
+                                   value="{{ wcfg.get('latitude', 48.69) }}" step="0.01">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Longitude</label>
+                            <input type="number" class="form-control form-control-sm" name="weather_lon"
+                                   value="{{ wcfg.get('longitude', 6.18) }}" step="0.01">
+                        </div>
+                    </div>
+                    <small class="text-muted mt-1 d-block">
+                        <a href="https://www.latlong.net/" target="_blank" rel="noopener">latlong.net</a> pour trouver vos coordonnées
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Enregistrer les widgets
+                </button>
+            </form>
+        </div>
+
+        <!-- ═══ ONGLET APPARENCE ═══ -->
+        <div class="tab-pane fade" id="tab-appearance">
+            <form id="settingsForm">
+                <div class="widget-card">
+                    <div class="mb-3">
+                        <label class="form-label">Titre de la page</label>
+                        <input type="text" class="form-control" name="title"
+                               value="{{ settings.get('title', '') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Thème</label>
+                        <select class="form-select" name="theme">
+                            <option value="dark" {% if settings.get('theme')=='dark' %}selected{% endif %}>🌙 Sombre</option>
+                            <option value="light" {% if settings.get('theme')=='light' %}selected{% endif %}>☀️ Clair</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Image de fond (URL)</label>
+                        <input type="url" class="form-control" name="background_url"
+                               value="{{ settings.get('background_url', '') }}"
+                               placeholder="https://exemple.com/fond.jpg">
+                        <div class="form-text">Laissez vide pour utiliser le fond par défaut.</div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Enregistrer l'apparence
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL GROUPE ═══ -->
+<div class="modal fade" id="groupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="groupForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="groupModalLabel">Nouveau groupe</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom du groupe</label>
+                        <input type="text" class="form-control" name="name" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Icône</label>
+                        <input type="text" class="form-control" name="icon" value="bi-folder"
+                               placeholder="bi-folder, 🏠, ou URL d'image">
+                        <div class="form-text">Bootstrap Icon (ex: bi-server), émoji ou URL d'image</div>
+                        <div class="icon-picker mt-2" id="groupIconPicker">
+                            <span class="icon-pick" data-icon="bi-folder"><i class="bi bi-folder"></i></span>
+                            <span class="icon-pick" data-icon="bi-server"><i class="bi bi-server"></i></span>
+                            <span class="icon-pick" data-icon="bi-house"><i class="bi bi-house"></i></span>
+                            <span class="icon-pick" data-icon="bi-globe"><i class="bi bi-globe"></i></span>
+                            <span class="icon-pick" data-icon="bi-tools"><i class="bi bi-tools"></i></span>
+                            <span class="icon-pick" data-icon="bi-book"><i class="bi bi-book"></i></span>
+                            <span class="icon-pick" data-icon="bi-camera-video"><i class="bi bi-camera-video"></i></span>
+                            <span class="icon-pick" data-icon="bi-music-note"><i class="bi bi-music-note"></i></span>
+                            <span class="icon-pick" data-icon="bi-controller"><i class="bi bi-controller"></i></span>
+                            <span class="icon-pick" data-icon="bi-cloud"><i class="bi bi-cloud"></i></span>
+                            <span class="icon-pick" data-icon="bi-shield-lock"><i class="bi bi-shield-lock"></i></span>
+                            <span class="icon-pick" data-icon="bi-cpu"><i class="bi bi-cpu"></i></span>
+                            <span class="icon-pick" data-icon="bi-router"><i class="bi bi-router"></i></span>
+                            <span class="icon-pick" data-icon="bi-hdd-network"><i class="bi bi-hdd-network"></i></span>
+                            <span class="icon-pick" data-icon="bi-printer"><i class="bi bi-printer"></i></span>
+                            <span class="icon-pick" data-icon="bi-film"><i class="bi bi-film"></i></span>
+                            <span class="icon-pick" data-icon="bi-cart"><i class="bi bi-cart"></i></span>
+                            <span class="icon-pick" data-icon="bi-bank"><i class="bi bi-bank"></i></span>
+                            <span class="icon-pick" data-icon="bi-heart"><i class="bi bi-heart"></i></span>
+                            <span class="icon-pick" data-icon="bi-star"><i class="bi bi-star"></i></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL LIEN ═══ -->
+<div class="modal fade" id="linkModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="linkForm">
+                <input type="hidden" name="group_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="linkModalLabel">Ajouter un lien</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom</label>
+                        <input type="text" class="form-control" name="name" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL</label>
+                        <input type="text" class="form-control" name="url" required maxlength="2000"
+                               placeholder="https://exemple.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Icône</label>
+                        <input type="text" class="form-control" name="icon" value="bi-link-45deg"
+                               placeholder="bi-link-45deg, 🔗, ou URL d'image">
+                        <div class="icon-picker mt-2" id="linkIconPicker">
+                            <span class="icon-pick" data-icon="bi-link-45deg"><i class="bi bi-link-45deg"></i></span>
+                            <span class="icon-pick" data-icon="bi-globe"><i class="bi bi-globe"></i></span>
+                            <span class="icon-pick" data-icon="bi-server"><i class="bi bi-server"></i></span>
+                            <span class="icon-pick" data-icon="bi-display"><i class="bi bi-display"></i></span>
+                            <span class="icon-pick" data-icon="bi-hdd-rack"><i class="bi bi-hdd-rack"></i></span>
+                            <span class="icon-pick" data-icon="bi-router"><i class="bi bi-router"></i></span>
+                            <span class="icon-pick" data-icon="bi-filetype-html"><i class="bi bi-filetype-html"></i></span>
+                            <span class="icon-pick" data-icon="bi-camera-video"><i class="bi bi-camera-video"></i></span>
+                            <span class="icon-pick" data-icon="bi-envelope"><i class="bi bi-envelope"></i></span>
+                            <span class="icon-pick" data-icon="bi-calendar"><i class="bi bi-calendar"></i></span>
+                            <span class="icon-pick" data-icon="bi-box"><i class="bi bi-box"></i></span>
+                            <span class="icon-pick" data-icon="bi-github"><i class="bi bi-github"></i></span>
+                            <span class="icon-pick" data-icon="bi-download"><i class="bi bi-download"></i></span>
+                            <span class="icon-pick" data-icon="bi-file-earmark-text"><i class="bi bi-file-earmark-text"></i></span>
+                            <span class="icon-pick" data-icon="bi-newspaper"><i class="bi bi-newspaper"></i></span>
+                            <span class="icon-pick" data-icon="bi-speedometer2"><i class="bi bi-speedometer2"></i></span>
+                            <span class="icon-pick" data-icon="bi-shield-check"><i class="bi bi-shield-check"></i></span>
+                            <span class="icon-pick" data-icon="bi-database"><i class="bi bi-database"></i></span>
+                            <span class="icon-pick" data-icon="bi-printer"><i class="bi bi-printer"></i></span>
+                            <span class="icon-pick" data-icon="bi-wifi"><i class="bi bi-wifi"></i></span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description <small class="text-muted">(optionnel)</small></label>
+                        <input type="text" class="form-control" name="description" maxlength="200"
+                               placeholder="Courte description">
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="check_status" id="checkStatusSwitch">
+                        <label class="form-check-label" for="checkStatusSwitch">
+                            Surveiller le statut (en ligne / hors ligne)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

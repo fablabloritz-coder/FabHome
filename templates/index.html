@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="homepage"
+     {% if settings.background_url %}style="background-image: url({{ settings.background_url | tojson }});"{% endif %}>
+
+    <!-- Zone widgets -->
+    <div class="widgets-bar">
+        {% if widgets.get('greeting') and widgets.greeting.enabled %}
+        <div class="widget-greeting">
+            <h1 id="greeting-text"></h1>
+        </div>
+        {% endif %}
+
+        {% if widgets.get('clock') and widgets.clock.enabled %}
+        <div class="widget-clock">
+            <div id="clock-time" class="clock-time"></div>
+            <div id="clock-date" class="clock-date"></div>
+        </div>
+        {% endif %}
+
+        {% if widgets.get('weather') and widgets.weather.enabled %}
+        <div class="widget-weather" id="weather-widget">
+            <i class="bi bi-cloud"></i>
+            <span id="weather-temp">--</span>°C
+            <small id="weather-city">{{ widgets.weather.config.get('city', '') }}</small>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if widgets.get('search') and widgets.search.enabled %}
+    <div class="search-bar">
+        <form id="search-form" class="search-form">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" id="search-input"
+                       placeholder="Rechercher sur le web…" autocomplete="off">
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Groupes de liens -->
+    <div class="groups-grid">
+        {% for group in groups %}
+        <div class="group-card">
+            <div class="group-header">
+                {% if group.icon.startswith('http') %}
+                <img src="{{ group.icon }}" class="group-icon-img" alt="">
+                {% elif group.icon|length <= 2 %}
+                <span>{{ group.icon }}</span>
+                {% else %}
+                <i class="bi {{ group.icon }}"></i>
+                {% endif %}
+                <span>{{ group.name }}</span>
+            </div>
+            <div class="group-links">
+                {% for link in group.links %}
+                <a href="{{ link.url }}" class="link-item" target="_blank" rel="noopener noreferrer">
+                    <div class="link-icon">
+                        {% if link.icon.startswith('http') %}
+                        <img src="{{ link.icon }}" alt="">
+                        {% elif link.icon|length <= 2 %}
+                        <span>{{ link.icon }}</span>
+                        {% else %}
+                        <i class="bi {{ link.icon }}"></i>
+                        {% endif %}
+                    </div>
+                    <div class="link-info">
+                        <div class="link-name">{{ link.name }}</div>
+                        {% if link.description %}
+                        <div class="link-desc">{{ link.description }}</div>
+                        {% endif %}
+                    </div>
+                    {% if link.check_status %}
+                    <span class="status-dot" data-status-id="{{ link.id }}"></span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not groups %}
+    <div class="empty-state">
+        <i class="bi bi-house-add"></i>
+        <p>Bienvenue ! Configurez votre page via le panneau
+            <a href="{{ url_for('admin') }}">d'administration</a>.</p>
+    </div>
+    {% endif %}
+
+    <!-- Bouton accès admin -->
+    <a href="{{ url_for('admin') }}" class="admin-fab" title="Administration">
+        <i class="bi bi-gear-fill"></i>
+    </a>
+</div>
+
+<script>
+const GREETING_NAME = {{ settings.get('greeting_name', '') | tojson }};
+const SEARCH_PROVIDER = {{ settings.get('search_provider', 'google') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}
