@@ -103,7 +103,6 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
-        CREATE INDEX IF NOT EXISTS idx_grid_widgets_page ON group_widgets(page_id);
     ''')
 
     # ── Migrations ────────────────────────────────────────
@@ -179,7 +178,8 @@ def init_db():
                 FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
             )
         ''')
-        conn.execute('CREATE INDEX IF NOT EXISTS idx_grid_widgets_page ON group_widgets(page_id)')
+    # Toujours créer l'index après migration (que ce soit fresh ou migré)
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_grid_widgets_page ON group_widgets(page_id)')
 
     # Profil par défaut
     if not conn.execute('SELECT 1 FROM profiles LIMIT 1').fetchone():
