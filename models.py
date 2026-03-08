@@ -75,7 +75,6 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
-        CREATE INDEX IF NOT EXISTS idx_groups_page ON groups_(page_id);
     ''')
 
     # ── Migrations ────────────────────────────────────────
@@ -88,6 +87,9 @@ def init_db():
         conn.execute('ALTER TABLE groups_ ADD COLUMN grid_col INTEGER NOT NULL DEFAULT 0')
     if 'page_id' not in cols:
         conn.execute('ALTER TABLE groups_ ADD COLUMN page_id INTEGER NOT NULL DEFAULT 1')
+
+    # Create this index only after legacy migrations added page_id.
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_groups_page ON groups_(page_id)')
 
     needs_placement = 'grid_row' not in cols
     if needs_placement:
