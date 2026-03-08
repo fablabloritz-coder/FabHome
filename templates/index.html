@@ -61,7 +61,7 @@
     {% endif %}
 
     <!-- ═══ ONGLETS PAGES ═══ -->
-    {% if pages|length > 1 or (request.args.get('edit')) %}
+    {% if pages|length > 0 %}
     <div class="page-tabs" id="pageTabs">
         {% for page in pages %}
         <a href="/?page={{ page.id }}"
