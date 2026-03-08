@@ -772,31 +772,6 @@
     }
 
     /* -- Chargement des donnees service -- */
-    function loadServices() {
-        var widgets = qsa('.service-widget');
-        widgets.forEach(function (w) {
-            var sid = parseInt(w.dataset.serviceId);
-            var stype = w.dataset.serviceType;
-            var statusEl = qs('#svc-status-' + sid);
-            var dataEl = qs('#svc-data-' + sid);
-
-            fetch('/api/services/' + sid + '/proxy')
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.error) {
-                        if (statusEl) statusEl.textContent = '\u26A0\uFE0F';
-                        if (dataEl) dataEl.textContent = data.error;
-                        return;
-                    }
-                    if (statusEl) statusEl.textContent = '\u2705';
-                    if (dataEl) renderServiceData(dataEl, stype, data);
-                })
-                .catch(function () {
-                    if (statusEl) statusEl.textContent = '\u274C';
-                });
-        });
-    }
-
     function renderServiceData(el, stype, data) {
         var html = '';
         if (data.error) {
@@ -1151,8 +1126,6 @@
     setInterval(loadWeather, 1800000);
     loadHealth();
     setInterval(loadHealth, 30000);
-    loadServices();
-
     // ── Grid Widget live updates ──
     function loadGridWidgetCalendars() {
         qsa('.grid-widget-card[data-widget-type="calendar"]').forEach(function(card) {

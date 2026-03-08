@@ -322,21 +322,7 @@
     </div>
     {% endif %}
 
-    <!-- ═══ SERVICES (widgets API intégrés) ═══ -->
-    {% if services %}
-    <div class="services-bar" id="servicesBar">
-        {% for svc in services if svc.enabled %}
-        <div class="service-widget" data-service-id="{{ svc.id }}" data-service-type="{{ svc.type }}">
-            <div class="service-header">
-                <i class="bi bi-{{ svc.type if svc.type != 'generic' else 'plug' }}"></i>
-                <span>{{ svc.name }}</span>
-                <span class="service-status" id="svc-status-{{ svc.id }}">…</span>
-            </div>
-            <div class="service-data" id="svc-data-{{ svc.id }}"></div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+
 
     <!-- FAB toggle -->
     <button class="fab edit-toggle" id="editToggle" title="Mode édition">

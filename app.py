@@ -574,6 +574,43 @@ def api_service_proxy(sid):
         return jsonify(error=str(e)), 502
 
 
+@app.route('/api/services/<int:sid>/test')
+def api_service_test(sid):
+    """Diagnostic de connectivité pour un service."""
+    services = models.get_services()
+    svc = next((s for s in services if s['id'] == sid), None)
+    if not svc:
+        return jsonify(error='Service non trouvé'), 404
+    svc_url = svc['url'].rstrip('/')
+    result = {'service': svc['name'], 'url': svc_url, 'type': svc.get('type', 'generic')}
+    import socket
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(svc_url)
+        host = parsed.hostname
+        port = parsed.port or 80
+        result['resolved_ip'] = socket.gethostbyname(host)
+        sock = socket.create_connection((host, port), timeout=5)
+        sock.close()
+        result['tcp_connect'] = True
+    except Exception as e:
+        result['tcp_connect'] = False
+        result['tcp_error'] = str(e)
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        req = Request(svc_url)
+        req.add_header('User-Agent', 'FabHome/1.0')
+        resp = urlopen(req, timeout=10, context=ctx)
+        result['http_status'] = resp.getcode()
+        result['http_ok'] = True
+    except Exception as e:
+        result['http_ok'] = False
+        result['http_error'] = str(e)
+    return jsonify(result)
+
+
 # ── API : Import / Export ─────────────────────────────────
 
 @app.route('/api/config/export')

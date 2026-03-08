@@ -585,30 +585,6 @@ button.page-tab { border: 1px dashed var(--fh-card-border); }
 /* ══════════════════════════════════════════
    WIDGETS SERVICES (API intégrées)
    ══════════════════════════════════════════ */
-.services-bar {
-    display: flex; flex-wrap: wrap; gap: 0.75rem;
-    justify-content: center;
-    width: 100%; max-width: 95vw;
-    margin-top: 2rem;
-}
-.service-widget {
-    background: var(--fh-card-bg); border: 1px solid var(--fh-card-border);
-    border-radius: 12px; padding: 0.75rem 1rem;
-    min-width: 200px; max-width: 320px;
-    backdrop-filter: blur(12px);
-}
-.service-header {
-    display: flex; align-items: center; gap: 0.5rem;
-    font-size: 0.82rem; font-weight: 600;
-    color: var(--fh-text-muted); margin-bottom: 0.4rem;
-}
-.service-status { margin-left: auto; font-size: 0.75rem; }
-.service-data {
-    font-size: 0.78rem; color: var(--fh-text);
-    display: flex; flex-wrap: wrap; gap: 0.5rem;
-}
-.svc-kv { display: inline-block; }
-
 /* ── PretGo / Fabtrack service widgets ── */
 .svc-app-block { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .svc-stat { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
