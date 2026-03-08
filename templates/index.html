@@ -1,6 +1,78 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- ═══ SÉLECTEUR DE PROFIL ═══ -->
+<div class="profile-selector" id="profileSelector">
+    <button class="profile-btn" id="currentProfileBtn" title="Changer de profil">
+        <span class="profile-icon">{{ current_profile.icon if current_profile else '👤' }}</span>
+        <span class="profile-name">{{ current_profile.name if current_profile else 'Principal' }}</span>
+        <i class="bi bi-chevron-down"></i>
+    </button>
+    <div class="profile-dropdown hidden" id="profileDropdown">
+        {% for profile in profiles %}
+        <div class="profile-item {% if profile.id == current_profile.id %}active{% endif %}"
+             data-profile-id="{{ profile.id }}"
+             style="border-left: 3px solid {{ profile.color }};">
+            <span class="profile-icon">{{ profile.icon }}</span>
+            <span class="profile-name">{{ profile.name }}</span>
+            {% if profile.id == current_profile.id %}
+            <i class="bi bi-check-lg ms-auto"></i>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.1);">
+        <div class="profile-item profile-add" data-action="add-profile">
+            <i class="bi bi-plus-circle"></i>
+            <span>Nouveau profil</span>
+        </div>
+        <div class="profile-item profile-manage" data-action="manage-profiles">
+            <i class="bi bi-gear"></i>
+            <span>Gérer les profils</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ HEADER SYSTÈME ═══ -->
+<header class="system-header">
+    <div class="system-header-left">
+        <h2 class="system-title">
+            <i class="bi bi-house-heart"></i>
+            {{ settings.title or "FabHome" }}
+        </h2>
+    </div>
+    
+    <div class="system-header-center">
+        {% if widgets.get('search') and widgets.search.enabled %}
+        <form id="search-form" class="search-form-header">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" id="search-input"
+                       placeholder="Rechercher sur le web…" autocomplete="off">
+            </div>
+        </form>
+        {% endif %}
+    </div>
+    
+    <div class="system-header-right">
+        {% if widgets.get('health') and widgets.health.enabled %}
+        <div class="widget-health-compact" id="health-widget-header">
+            <div class="health-item-compact" title="CPU">
+                <i class="bi bi-cpu"></i>
+                <small id="health-cpu-pct-header">--%</small>
+            </div>
+            <div class="health-item-compact" title="RAM">
+                <i class="bi bi-memory"></i>
+                <small id="health-ram-pct-header">--%</small>
+            </div>
+            <div class="health-item-compact" title="Disque">
+                <i class="bi bi-device-hdd"></i>
+                <small id="health-disk-pct-header">--%</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</header>
+
 <div class="homepage"
      {% if settings.background_url %}style="background-image: url('{{ settings.background_url }}');"{% endif %}>
 
@@ -27,38 +99,38 @@
         </div>
         {% endif %}
 
-        {% if widgets.get('health') and widgets.health.enabled %}
-        <div class="widget-health" id="health-widget">
-            <div class="health-item" title="CPU">
-                <i class="bi bi-cpu"></i>
-                <div class="health-bar"><div class="health-fill" id="health-cpu"></div></div>
-                <small id="health-cpu-pct">--%</small>
+        {% if widgets.get('calendar') and widgets.calendar.enabled %}
+        <div class="widget-calendar" id="calendar-widget">
+            <div class="widget-cal-header">
+                <i class="bi bi-calendar3"></i>
+                <span>Événements</span>
             </div>
-            <div class="health-item" title="RAM">
-                <i class="bi bi-memory"></i>
-                <div class="health-bar"><div class="health-fill" id="health-ram"></div></div>
-                <small id="health-ram-pct">--%</small>
+            <div class="calendar-events" id="calendar-events">
+                <div class="loading-text">Chargement...</div>
             </div>
-            <div class="health-item" title="Disque">
-                <i class="bi bi-device-hdd"></i>
-                <div class="health-bar"><div class="health-fill" id="health-disk"></div></div>
-                <small id="health-disk-pct">--%</small>
+        </div>
+        {% endif %}
+
+        {% if widgets.get('camera') and widgets.camera.enabled %}
+        <div class="widget-camera" id="camera-widget">
+            <div class="widget-cam-header">
+                <i class="bi bi-camera-video"></i>
+                <span>Caméras</span>
+            </div>
+            <div class="camera-grid" id="camera-grid">
+                {% for stream in widgets.camera.config.get('streams', []) %}
+                <div class="camera-stream">
+                    <div class="camera-title">{{ stream.name }}</div>
+                    <img src="{{ stream.url }}" alt="{{ stream.name }}" class="camera-img" loading="lazy">
+                </div>
+                {% endfor %}
+                {% if not widgets.camera.config.get('streams') %}
+                <div class="camera-empty">Aucune caméra configurée</div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
     </div>
-
-    {% if widgets.get('search') and widgets.search.enabled %}
-    <div class="search-bar">
-        <form id="search-form" class="search-form">
-            <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control" id="search-input"
-                       placeholder="Rechercher sur le web…" autocomplete="off">
-            </div>
-        </form>
-    </div>
-    {% endif %}
 
     <!-- ═══ ONGLETS PAGES ═══ -->
     {% if pages|length > 0 %}
@@ -532,6 +604,45 @@
                                     </div>
                                 </div>
                                 <small class="form-text text-muted">CPU, RAM et disque du serveur</small>
+                                                        <div class="settings-widget-row">
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <strong><i class="bi bi-calendar3"></i> Calendrier (Nextcloud)</strong>
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox" name="calendar_enabled" checked>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row g-2 mt-1">
+                                                                <div class="col-12">
+                                                                    <input type="text" class="form-control form-control-sm" name="caldav_url"
+                                                                           value="{{ settings.get('caldav_url', '') }}" 
+                                                                           placeholder="https://nextcloud.exemple.com/remote.php/dav">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <input type="text" class="form-control form-control-sm" name="caldav_username"
+                                                                           value="{{ settings.get('caldav_username', '') }}" 
+                                                                           placeholder="Utilisateur">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <input type="password" class="form-control form-control-sm" name="caldav_password"
+                                                                           value="{{ settings.get('caldav_password', '') }}" 
+                                                                           placeholder="Mot de passe">
+                                                                </div>
+                                                            </div>
+                                                            <small class="form-text text-muted">Connexion CalDAV pour synchroniser vos événements</small>
+                                                        </div>
+                                                        <div class="settings-widget-row">
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <strong><i class="bi bi-camera-video"></i> Caméras de sécurité</strong>
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox" name="camera_enabled" checked>
+                                                                </div>
+                                                            </div>
+                                                            <div class="mt-2">
+                                                                <textarea class="form-control form-control-sm" name="camera_urls" rows="4" 
+                                                                          placeholder="Une URL par ligne:&#10;Caméra Entrée|http://192.168.1.100/snapshot.jpg&#10;Caméra Jardin|http://192.168.1.101/snapshot.jpg">{{ settings.get('camera_urls', '') }}</textarea>
+                                                                <small class="form-text text-muted">Format: Nom|URL (un flux par ligne)</small>
+                                                            </div>
+                                                        </div>
                             </div>
                         </div>
                         <div class="tab-pane fade" id="stServices">

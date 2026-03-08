@@ -24,15 +24,27 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript('''
+        CREATE TABLE IF NOT EXISTS profiles (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            name       TEXT    NOT NULL UNIQUE,
+            icon       TEXT    NOT NULL DEFAULT '👤',
+            color      TEXT    NOT NULL DEFAULT '#6c757d',
+            created_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS settings (
-            key   TEXT PRIMARY KEY,
-            value TEXT NOT NULL DEFAULT ''
+            profile_id INTEGER NOT NULL DEFAULT 1,
+            key        TEXT    NOT NULL,
+            value      TEXT    NOT NULL DEFAULT '',
+            PRIMARY KEY (profile_id, key),
+            FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS pages (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_id INTEGER NOT NULL DEFAULT 1,
             name       TEXT    NOT NULL DEFAULT 'Accueil',
             icon       TEXT    NOT NULL DEFAULT 'bi-house',
-            sort_order INTEGER NOT NULL DEFAULT 0
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS groups_ (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,10 +71,13 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS widgets (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            type       TEXT    NOT NULL UNIQUE,
+            profile_id INTEGER NOT NULL DEFAULT 1,
+            type       TEXT    NOT NULL,
             config     TEXT    NOT NULL DEFAULT '{}',
             enabled    INTEGER NOT NULL DEFAULT 1,
-            sort_order INTEGER NOT NULL DEFAULT 0
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(profile_id, type),
+            FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS services (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,9 +90,38 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
+        CREATE INDEX IF NOT EXISTS idx_pages_profile ON pages(profile_id);
+        CREATE INDEX IF NOT EXISTS idx_widgets_profile ON widgets(profile_id);
     ''')
 
     # ── Migrations ────────────────────────────────────────
+    
+    # Migration profils : ajouter profile_id aux anciennes tables
+    pages_cols = [r[1] for r in conn.execute("PRAGMA table_info(pages)").fetchall()]
+    if 'profile_id' not in pages_cols:
+        conn.execute('ALTER TABLE pages ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1')
+    
+    widgets_cols = [r[1] for r in conn.execute("PRAGMA table_info(widgets)").fetchall()]
+    if 'profile_id' not in widgets_cols:
+        conn.execute('ALTER TABLE widgets ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1')
+    
+    settings_cols = [r[1] for r in conn.execute("PRAGMA table_info(settings)").fetchall()]
+    if settings_cols and settings_cols[0] != 'profile_id':
+        # Migration depuis l'ancien format settings (key TEXT PRIMARY KEY)
+        old_settings = conn.execute('SELECT key, value FROM settings').fetchall()
+        conn.execute('DROP TABLE settings')
+        conn.execute('''
+            CREATE TABLE settings (
+                profile_id INTEGER NOT NULL DEFAULT 1,
+                key        TEXT    NOT NULL,
+                value      TEXT    NOT NULL DEFAULT '',
+                PRIMARY KEY (profile_id, key),
+                FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+            )
+        ''')
+        for key, value in old_settings:
+            conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (key, value))
+    
     cols = [r[1] for r in conn.execute("PRAGMA table_info(groups_)").fetchall()]
     if 'col_span' not in cols:
         conn.execute('ALTER TABLE groups_ ADD COLUMN col_span INTEGER NOT NULL DEFAULT 1')
@@ -88,7 +132,6 @@ def init_db():
     if 'page_id' not in cols:
         conn.execute('ALTER TABLE groups_ ADD COLUMN page_id INTEGER NOT NULL DEFAULT 1')
 
-    # Create this index only after legacy migrations added page_id.
     conn.execute('CREATE INDEX IF NOT EXISTS idx_groups_page ON groups_(page_id)')
 
     needs_placement = 'grid_row' not in cols
@@ -102,32 +145,13 @@ def init_db():
             conn.execute('UPDATE groups_ SET grid_row=?, grid_col=? WHERE id=?',
                          (r, c, row[0]))
 
-    # Tables ajoutées en migration
-    tables = [r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-    if 'pages' not in tables:
-        conn.executescript('''
-            CREATE TABLE IF NOT EXISTS pages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL DEFAULT 'Accueil',
-                icon TEXT NOT NULL DEFAULT 'bi-house',
-                sort_order INTEGER NOT NULL DEFAULT 0
-            );
-        ''')
-    if 'services' not in tables:
-        conn.executescript('''
-            CREATE TABLE IF NOT EXISTS services (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'generic',
-                url TEXT NOT NULL DEFAULT '', api_key TEXT NOT NULL DEFAULT '',
-                config TEXT NOT NULL DEFAULT '{}',
-                enabled INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0
-            );
-        ''')
-
-    # Page par défaut
-    if not conn.execute('SELECT 1 FROM pages LIMIT 1').fetchone():
-        conn.execute("INSERT INTO pages (id, name, icon, sort_order) VALUES (1, 'Accueil', 'bi-house', 0)")
+    # Profil par défaut
+    if not conn.execute('SELECT 1 FROM profiles LIMIT 1').fetchone():
+        conn.execute("INSERT INTO profiles (id, name, icon, color) VALUES (1, 'Principal', '👤', '#0d6efd')")
+    
+    # Page par défaut pour profil 1
+    if not conn.execute('SELECT 1 FROM pages WHERE profile_id=1 LIMIT 1').fetchone():
+        conn.execute("INSERT INTO pages (id, profile_id, name, icon, sort_order) VALUES (1, 1, 'Accueil', 'bi-house', 0)")
 
     # ── Réglages par défaut ───────────────────────────────
     for k, v in {
@@ -139,7 +163,7 @@ def init_db():
         'grid_cols': '4',
         'grid_rows': '3',
     }.items():
-        conn.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (k, v))
+        conn.execute('INSERT OR IGNORE INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
 
     for wtype, cfg, en, order in [
         ('greeting', '{}', 1, 0),
@@ -147,9 +171,11 @@ def init_db():
         ('clock',    '{}', 1, 2),
         ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 3),
         ('health',   '{}', 0, 4),
+        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 0, 5),
+        ('camera',   '{"streams":[]}', 0, 6),
     ]:
         conn.execute(
-            'INSERT OR IGNORE INTO widgets (type, config, enabled, sort_order) VALUES (?,?,?,?)',
+            'INSERT OR IGNORE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (1,?,?,?,?)',
             (wtype, cfg, en, order))
 
     conn.commit()
@@ -157,37 +183,130 @@ def init_db():
     logger.info("Base de données initialisée : %s", DB_PATH)
 
 
+# ── Profils ───────────────────────────────────────────────
+
+def get_profiles():
+    conn = get_db()
+    rows = [dict(r) for r in conn.execute(
+        'SELECT * FROM profiles ORDER BY id').fetchall()]
+    conn.close()
+    return rows
+
+
+def get_profile(profile_id):
+    conn = get_db()
+    row = conn.execute('SELECT * FROM profiles WHERE id=?', (profile_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def create_profile(name, icon='👤', color='#6c757d'):
+    conn = get_db()
+    cur = conn.execute(
+        'INSERT INTO profiles (name, icon, color) VALUES (?,?,?)',
+        (name, icon, color))
+    profile_id = cur.lastrowid
+    
+    # Créer les réglages par défaut pour le nouveau profil
+    for k, v in {
+        'title': "Ma Page d'Accueil",
+        'theme': 'dark',
+        'background_url': '',
+        'greeting_name': name,
+        'search_provider': 'google',
+        'grid_cols': '4',
+        'grid_rows': '3',
+    }.items():
+        conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (?, ?, ?)',
+                     (profile_id, k, v))
+    
+    # Créer une page par défaut
+    conn.execute('INSERT INTO pages (profile_id, name, icon, sort_order) VALUES (?, ?, ?, ?)',
+                 (profile_id, 'Accueil', 'bi-house', 0))
+    
+    # Créer les widgets par défaut
+    for wtype, cfg, en, order in [
+        ('greeting', '{}', 1, 0),
+        ('search',   '{"provider":"google"}', 1, 1),
+        ('clock',    '{}', 1, 2),
+        ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 3),
+        ('health',   '{}', 0, 4),
+        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 0, 5),
+        ('camera',   '{"streams":[]}', 0, 6),
+    ]:
+        conn.execute(
+            'INSERT INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
+            (profile_id, wtype, cfg, en, order))
+    
+    conn.commit()
+    conn.close()
+    return profile_id
+
+
+def update_profile(profile_id, name=None, icon=None, color=None):
+    conn = get_db()
+    fields = []
+    params = []
+    if name is not None:
+        fields.append('name=?')
+        params.append(name)
+    if icon is not None:
+        fields.append('icon=?')
+        params.append(icon)
+    if color is not None:
+        fields.append('color=?')
+        params.append(color)
+    if fields:
+        params.append(profile_id)
+        conn.execute('UPDATE profiles SET ' + ','.join(fields) + ' WHERE id=?', params)
+        conn.commit()
+    conn.close()
+
+
+def delete_profile(profile_id):
+    if profile_id == 1:
+        return  # Ne pas supprimer le profil par défaut
+    conn = get_db()
+    conn.execute('DELETE FROM profiles WHERE id=?', (profile_id,))
+    conn.commit()
+    conn.close()
+
+
 # ── Réglages ──────────────────────────────────────────────
 
-def get_settings():
+def get_settings(profile_id=1):
     conn = get_db()
-    rows = conn.execute('SELECT key, value FROM settings').fetchall()
+    rows = conn.execute('SELECT key, value FROM settings WHERE profile_id=?',
+                        (profile_id,)).fetchall()
     conn.close()
     return {r['key']: r['value'] for r in rows}
 
 
-def update_setting(key, value):
+def update_setting(key, value, profile_id=1):
     conn = get_db()
-    conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
+    conn.execute('INSERT OR REPLACE INTO settings (profile_id, key, value) VALUES (?, ?, ?)',
+                 (profile_id, key, value))
     conn.commit()
     conn.close()
 
 
 # ── Pages ─────────────────────────────────────────────────
 
-def get_pages():
+def get_pages(profile_id=1):
     conn = get_db()
     rows = [dict(r) for r in conn.execute(
-        'SELECT * FROM pages ORDER BY sort_order, id').fetchall()]
+        'SELECT * FROM pages WHERE profile_id=? ORDER BY sort_order, id',
+        (profile_id,)).fetchall()]
     conn.close()
     return rows
 
 
-def create_page(name, icon='bi-file-earmark'):
+def create_page(name, icon='bi-file-earmark', profile_id=1):
     conn = get_db()
-    mx = conn.execute('SELECT COALESCE(MAX(sort_order),0) FROM pages').fetchone()[0]
-    cur = conn.execute('INSERT INTO pages (name, icon, sort_order) VALUES (?,?,?)',
-                       (name, icon, mx + 1))
+    mx = conn.execute('SELECT COALESCE(MAX(sort_order),0) FROM pages WHERE profile_id=?',
+                      (profile_id,)).fetchone()[0]
+    cur = conn.execute('INSERT INTO pages (profile_id, name, icon, sort_order) VALUES (?,?,?,?)',
+                       (profile_id, name, icon, mx + 1))
     pid = cur.lastrowid
     conn.commit()
     conn.close()
@@ -343,20 +462,21 @@ def reorder_links(group_id, ordered_ids):
 
 # ── Widgets ───────────────────────────────────────────────
 
-def get_widgets():
+def get_widgets(profile_id=1):
     conn = get_db()
     rows = [dict(r) for r in conn.execute(
-        'SELECT * FROM widgets ORDER BY sort_order, id').fetchall()]
+        'SELECT * FROM widgets WHERE profile_id=? ORDER BY sort_order, id',
+        (profile_id,)).fetchall()]
     conn.close()
     for r in rows:
         r['config'] = json.loads(r['config'])
     return rows
 
 
-def update_widget(wtype, enabled, config):
+def update_widget(wtype, enabled, config, profile_id=1):
     conn = get_db()
-    conn.execute('UPDATE widgets SET enabled=?, config=? WHERE type=?',
-                 (enabled, json.dumps(config), wtype))
+    conn.execute('UPDATE widgets SET enabled=?, config=? WHERE profile_id=? AND type=?',
+                 (enabled, json.dumps(config), profile_id, wtype))
     conn.commit()
     conn.close()
 

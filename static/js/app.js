@@ -924,6 +924,131 @@
     setInterval(loadHealth, 30000);
     loadServices();
 
+    /* ══════════════════════════════════════
+       GESTION DES PROFILS
+       ══════════════════════════════════════ */
+
+    function initProfiles() {
+        var profileSelector = qs('.profile-selector');
+        if (!profileSelector) return;
+
+        var profileBtn = qs('.profile-btn', profileSelector);
+        var profileDropdown = qs('.profile-dropdown', profileSelector);
+
+        // Toggle dropdown
+        profileBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function () {
+            profileDropdown.classList.add('hidden');
+        });
+
+        // Profile switching
+        qsa('.profile-item[data-profile-id]', profileDropdown).forEach(function (item) {
+            item.addEventListener('click', function () {
+                var profileId = this.getAttribute('data-profile-id');
+                api('POST', '/api/profiles/switch', { profile_id: parseInt(profileId) })
+                    .then(function () {
+                        window.location.reload();
+                    })
+                    .catch(function (e) {
+                        alert('Erreur changement profil: ' + e.message);
+                    });
+            });
+        });
+
+        // Add profile button
+        var addBtn = qs('.profile-add', profileDropdown);
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                var name = prompt('Nom du profil:');
+                if (!name) return;
+                var icon = prompt('Icône (emoji):', '👤');
+                if (!icon) return;
+
+                api('POST', '/api/profiles', { name: name, icon: icon })
+                    .then(function () {
+                        window.location.reload();
+                    })
+                    .catch(function (e) {
+                        alert('Erreur création profil: ' + e.message);
+                    });
+            });
+        }
+    }
+
+    /* ══════════════════════════════════════
+       WIDGET CALENDRIER
+       ══════════════════════════════════════ */
+
+    function loadCalendar() {
+        var calendarWidget = qs('.widget-calendar');
+        if (!calendarWidget) return;
+
+        var eventsList = qs('.calendar-events', calendarWidget);
+        if (!eventsList) return;
+
+        eventsList.innerHTML = '<div class="loading-text">Chargement...</div>';
+
+        api('GET', '/api/calendar/events')
+            .then(function (data) {
+                if (!data.events || data.events.length === 0) {
+                    eventsList.innerHTML = '<div class="calendar-empty">Aucun événement</div>';
+                    return;
+                }
+
+                eventsList.innerHTML = data.events.map(function (event) {
+                    var html = '<div class="calendar-event">';
+                    html += '<div class="calendar-event-title">' + (event.title || 'Sans titre') + '</div>';
+                    html += '<div class="calendar-event-time">' + event.start + '</div>';
+                    if (event.location) {
+                        html += '<div class="calendar-event-location"><i class="bi bi-geo-alt"></i> ' + event.location + '</div>';
+                    }
+                    html += '</div>';
+                    return html;
+                }).join('');
+            })
+            .catch(function (e) {
+                eventsList.innerHTML = '<div class="calendar-empty">Erreur: ' + e.message + '</div>';
+            });
+    }
+
+    /* ══════════════════════════════════════
+       WIDGET CAMÉRAS
+       ══════════════════════════════════════ */
+
+    function initCameras() {
+        var cameraWidget = qs('.widget-camera');
+        if (!cameraWidget) return;
+
+        var cameraGrid = qs('.camera-grid', cameraWidget);
+        if (!cameraGrid) return;
+
+        qsa('.camera-img', cameraGrid).forEach(function (img) {
+            // Auto-refresh every 5 seconds
+            setInterval(function () {
+                var src = img.getAttribute('src');
+                if (src && src.indexOf('?') !== -1) {
+                    img.src = src.split('?')[0] + '?t=' + Date.now();
+                } else if (src) {
+                    img.src = src + '?t=' + Date.now();
+                }
+            }, 5000);
+        });
+    }
+
+    /* ══════════════════════════════════════
+       INITIALISATION
+       ══════════════════════════════════════ */
+
+    initProfiles();
+    loadCalendar();
+    setInterval(loadCalendar, 300000); // Refresh every 5 minutes
+    initCameras();
+
     if (PAGE_DATA.editOnLoad) {
         setEditMode(true);
     } else {

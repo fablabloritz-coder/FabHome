@@ -105,7 +105,348 @@
 
 /* ── Base ─────────────────────────────── */
 * { box-sizing: border-box; }
-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding-top: 70px; }
+/* Utility classes */
+.hidden { display: none !important; }
+
+
+/* ══════════════════════════════════════════
+   SÉLECTEUR DE PROFIL
+   ══════════════════════════════════════════ */
+.profile-selector {
+    position: fixed;
+    top: 15px;
+    right: 20px;
+    z-index: 1001;
+}
+
+.profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 25px;
+    color: white;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s;
+    font-size: 14px;
+}
+
+.profile-btn:hover {
+    background: rgba(0,0,0,0.8);
+    border-color: rgba(255,255,255,0.4);
+    transform: translateY(-1px);
+}
+
+.profile-icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.profile-name {
+    font-weight: 500;
+}
+
+.profile-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 240px;
+    background: rgba(30,30,30,0.95);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: rgba(255,255,255,0.9);
+}
+
+.profile-item:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.profile-item.active {
+    background: rgba(13,110,253,0.2);
+}
+
+.profile-item .profile-icon {
+    font-size: 18px;
+}
+
+.profile-item .profile-name {
+    flex: 1;
+    font-size: 14px;
+}
+
+.profile-add, .profile-manage {
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+}
+
+.profile-add:hover, .profile-manage:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+/* ══════════════════════════════════════════
+   HEADER SYSTÈME
+   ══════════════════════════════════════════ */
+.system-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(20,20,20,0.95);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 999;
+}
+
+.system-header-left {
+    display: flex;
+    align-items: center;
+}
+
+.system-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fh-text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.system-header-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.search-form-header {
+    width: 100%;
+    max-width: 500px;
+}
+
+.search-form-header .input-group {
+    border-radius: 24px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.1);
+}
+
+.search-form-header .input-group-text {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.6);
+}
+
+.search-form-header .form-control {
+    background: transparent;
+    border: none;
+    color: var(--fh-text);
+}
+
+.search-form-header .form-control:focus {
+    box-shadow: none;
+    background: rgba(255,255,255,0.15);
+}
+
+.system-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.widget-health-compact {
+    display: flex;
+    gap: 16px;
+}
+
+.health-item-compact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+}
+
+.health-item-compact i {
+    font-size: 16px;
+}
+
+.health-item-compact small {
+    font-weight: 500;
+}
+
+/* ══════════════════════════════════════════
+   WIDGET CALENDRIER
+   ══════════════════════════════════════════ */
+.widget-calendar {
+    background: var(--fh-card-bg);
+    border: 1px solid var(--fh-card-border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    max-width: 400px;
+    width: 100%;
+}
+
+.widget-cal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--fh-text);
+}
+
+.widget-cal-header i {
+    font-size: 18px;
+    color: var(--fh-accent);
+}
+
+.calendar-events {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.calendar-event {
+    background: rgba(255,255,255,0.05);
+    border-left: 3px solid var(--fh-accent);
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.calendar-event:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.calendar-event-title {
+    font-weight: 500;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.calendar-event-time {
+    font-size: 12px;
+    color: var(--fh-text-muted);
+}
+
+.calendar-event-location {
+    font-size: 11px;
+    color: var(--fh-text-muted);
+    margin-top: 2px;
+}
+
+.loading-text {
+    text-align: center;
+    color: var(--fh-text-muted);
+    font-size: 13px;
+    padding: 20px;
+}
+
+.calendar-empty {
+    text-align: center;
+    color: var(--fh-text-muted);
+    font-size: 13px;
+    padding: 20px;
+}
+
+/* ══════════════════════════════════════════
+   WIDGET CAMÉRA
+   ══════════════════════════════════════════ */
+.widget-camera {
+    background: var(--fh-card-bg);
+    border: 1px solid var(--fh-card-border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    max-width: 800px;
+    width: 100%;
+}
+
+.widget-cam-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--fh-text);
+}
+
+.widget-cam-header i {
+    font-size: 18px;
+    color: var(--fh-accent);
+}
+
+.camera-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.camera-stream {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.camera-title {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 1;
+}
+
+.camera-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-empty {
+    text-align: center;
+    color: var(--fh-text-muted);
+    padding: 40px 20px;
+    font-size: 14px;
+}
 
 .homepage {
     min-height: 100vh;

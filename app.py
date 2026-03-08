@@ -7,15 +7,24 @@ import json
 import ssl
 import uuid
 import glob
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, session
 
 import models
 
+try:
+    import caldav
+    CALDAV_AVAILABLE = True
+except ImportError:
+    CALDAV_AVAILABLE = False
+    logging.warning("caldav non installé - widget calendrier indisponible")
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+app.config['SECRET_KEY'] = os.environ.get('FABHOME_SECRET', os.urandom(24).hex())
 
 UPLOAD_DIR = os.path.join(os.environ.get('FABHOME_DATA', 'data'), 'uploads')
 ICON_DIR = os.path.join(UPLOAD_DIR, 'icons')
@@ -34,29 +43,119 @@ models.init_db()
 _cache = {}
 
 
+def get_current_profile_id():
+    """Récupère l'ID du profil actif depuis la session."""
+    return session.get('profile_id', 1)
+
+
+def set_current_profile_id(profile_id):
+    """Définit l'ID du profil actif dans la session."""
+    session['profile_id'] = profile_id
+
+
 # ── Pages ─────────────────────────────────────────────────
 
 @app.route('/')
 def index():
-    settings = models.get_settings()
-    pages = models.get_pages()
+    profile_id = get_current_profile_id()
+    settings = models.get_settings(profile_id)
+    pages = models.get_pages(profile_id)
     page_id = request.args.get('page', 1, type=int)
     groups = models.get_groups(page_id=page_id)
-    widgets = {w['type']: w for w in models.get_widgets()}
+    widgets = {w['type']: w for w in models.get_widgets(profile_id)}
+    
+        # Parse camera URLs from settings
+        camera_urls = settings.get('camera_urls', '')
+        camera_streams = []
+        if camera_urls:
+            for line in camera_urls.strip().split('\n'):
+                line = line.strip()
+                if '|' in line:
+                    name, url = line.split('|', 1)
+                    camera_streams.append({'name': name.strip(), 'url': url.strip()})
+    
+        # Add camera streams to camera widget
+        if 'camera' not in widgets:
+            widgets['camera'] = {'type': 'camera', 'enabled': True, 'config': {}}
+        if not widgets['camera'].get('config'):
+            widgets['camera']['config'] = {}
+        widgets['camera']['config']['streams'] = camera_streams
+    
     services = models.get_services()
+    profiles = models.get_profiles()
+    current_profile = models.get_profile(profile_id)
+    
     return render_template('index.html',
                            settings=settings, groups=groups, widgets=widgets,
                            pages=pages, current_page=page_id,
                            services=services,
+                           profiles=profiles,
+                           current_profile=current_profile,
                            groups_json=json.dumps(groups),
                            widgets_json=json.dumps(widgets),
                            pages_json=json.dumps(pages),
-                           services_json=json.dumps(services))
+                           services_json=json.dumps(services),
+                           profiles_json=json.dumps(profiles))
 
 
 @app.route('/admin')
 def admin():
     return redirect(url_for('index', edit=1))
+
+
+# ── API : Profils ─────────────────────────────────────────
+
+@app.route('/api/profiles', methods=['GET'])
+def api_get_profiles():
+    return jsonify(profiles=models.get_profiles(),
+                   current=get_current_profile_id())
+
+
+@app.route('/api/profiles', methods=['POST'])
+def api_create_profile():
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify(error='Nom requis'), 400
+    profile_id = models.create_profile(
+        name[:50],
+        (data.get('icon') or '👤')[:10],
+        (data.get('color') or '#6c757d')[:20])
+    return jsonify(id=profile_id), 201
+
+
+@app.route('/api/profiles/<int:profile_id>', methods=['PUT'])
+def api_update_profile(profile_id):
+    data = request.get_json() or {}
+    models.update_profile(
+        profile_id,
+        name=data.get('name'),
+        icon=data.get('icon'),
+        color=data.get('color'))
+    return jsonify(ok=True)
+
+
+@app.route('/api/profiles/<int:profile_id>', methods=['DELETE'])
+def api_delete_profile(profile_id):
+    if profile_id == 1:
+        return jsonify(error='Cannot delete default profile'), 400
+    models.delete_profile(profile_id)
+    if get_current_profile_id() == profile_id:
+        set_current_profile_id(1)
+    return jsonify(ok=True)
+
+
+@app.route('/api/profiles/switch', methods=['POST'])
+def api_switch_profile():
+    data = request.get_json() or {}
+    profile_id = data.get('profile_id')
+    if not profile_id:
+        return jsonify(error='profile_id requis'), 400
+    profile = models.get_profile(profile_id)
+    if not profile:
+        return jsonify(error='Profil introuvable'), 404
+    set_current_profile_id(profile_id)
+    return jsonify(ok=True, profile_id=profile_id)
 
 
 # ── API : Réglages ────────────────────────────────────────
@@ -66,11 +165,12 @@ def api_update_settings():
     data = request.get_json()
     if not data:
         return jsonify(error='Données manquantes'), 400
+    profile_id = get_current_profile_id()
     allowed = {'title', 'theme', 'background_url', 'greeting_name',
                'search_provider', 'grid_cols', 'grid_rows'}
     for k, v in data.items():
         if k in allowed:
-            models.update_setting(k, str(v)[:500])
+            models.update_setting(k, str(v)[:500], profile_id)
     return jsonify(ok=True)
 
 
@@ -197,12 +297,14 @@ def api_update_widgets():
     data = request.get_json()
     if not data:
         return jsonify(error='Données manquantes'), 400
-    allowed = {'greeting', 'search', 'clock', 'weather', 'health'}
+    profile_id = get_current_profile_id()
+    allowed = {'greeting', 'search', 'clock', 'weather', 'health', 'calendar', 'camera'}
     for wtype, wdata in data.items():
         if wtype in allowed and isinstance(wdata, dict):
             models.update_widget(wtype,
                                  1 if wdata.get('enabled') else 0,
-                                 wdata.get('config', {}))
+                                 wdata.get('config', {}),
+                                 profile_id)
     return jsonify(ok=True)
 
 
@@ -214,7 +316,8 @@ def api_create_page():
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Nom requis'), 400
-    pid = models.create_page(name[:100], (data.get('icon') or 'bi-file-earmark')[:500])
+    profile_id = get_current_profile_id()
+    pid = models.create_page(name[:100], (data.get('icon') or 'bi-file-earmark')[:500], profile_id)
     return jsonify(id=pid), 201
 
 
@@ -372,6 +475,82 @@ def api_upload_background():
     return jsonify(url=bg_url), 201
 
 
+# Calendar events (Nextcloud CalDAV)
+@app.route('/api/calendar/events')
+def api_calendar_events():
+    """Récupère les événements du calendrier Nextcloud via CalDAV."""
+    if not CALDAV_AVAILABLE:
+        return jsonify(error="caldav non installé"), 503
+    
+    profile_id = get_current_profile_id()
+    
+    # Récupérer les paramètres du calendrier depuis les settings
+    caldav_url = models.get_setting('caldav_url', profile_id) or ''
+    caldav_username = models.get_setting('caldav_username', profile_id) or ''
+    caldav_password = models.get_setting('caldav_password', profile_id) or ''
+    
+    if not all([caldav_url, caldav_username, caldav_password]):
+        return jsonify(events=[], message="Configuration CalDAV manquante")
+    
+    try:
+        # Connexion au serveur CalDAV
+        client = caldav.DAVClient(
+            url=caldav_url,
+            username=caldav_username,
+            password=caldav_password
+        )
+        principal = client.principal()
+        calendars = principal.calendars()
+        
+        if not calendars:
+            return jsonify(events=[], message="Aucun calendrier trouvé")
+        
+        # Récupérer les événements des 7 prochains jours
+        start = datetime.now()
+        end = start + timedelta(days=7)
+        
+        all_events = []
+        for calendar in calendars:
+            try:
+                events = calendar.date_search(start=start, end=end)
+                for event in events:
+                    try:
+                        vevent = event.icalendar_component
+                        summary = str(vevent.get('summary', 'Sans titre'))
+                        dtstart = vevent.get('dtstart')
+                        location = vevent.get('location', '')
+                        
+                        if dtstart:
+                            start_dt = dtstart.dt
+                            if isinstance(start_dt, datetime):
+                                start_str = start_dt.strftime('%d/%m %H:%M')
+                            else:
+                                start_str = start_dt.strftime('%d/%m')
+                        else:
+                            start_str = ''
+                        
+                        all_events.append({
+                            'title': summary,
+                            'start': start_str,
+                            'location': str(location) if location else ''
+                        })
+                    except Exception as e:
+                        logging.warning(f"Erreur parsing événement: {e}")
+                        continue
+            except Exception as e:
+                logging.warning(f"Erreur récupération calendrier: {e}")
+                continue
+        
+        # Trier par date
+        all_events.sort(key=lambda x: x['start'])
+        
+        return jsonify(events=all_events[:10])  # Limiter à 10 événements
+        
+    except Exception as e:
+        logging.error(f"Erreur CalDAV: {e}")
+        return jsonify(error=str(e)), 500
+
+
 # Proxy favicon
 @app.route('/api/favicon')
 def api_favicon():
@@ -383,10 +562,58 @@ def api_favicon():
         domain = parsed.hostname
         if not domain:
             return jsonify(error='Domaine invalide'), 400
-        # Google favicon service
-        return jsonify(icon='https://www.google.com/s2/favicons?domain=' +
-                       domain + '&sz=64')
-    except Exception:
+        
+        # Stratégie multi-niveaux pour récupérer le meilleur favicon
+        # 1. Essayer /favicon.ico direct
+        favicon_url = f"{parsed.scheme}://{domain}/favicon.ico"
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = Request(favicon_url)
+            req.add_header('User-Agent', 'Mozilla/5.0 FabHome/1.0')
+            response = urlopen(req, timeout=3, context=ctx)
+            if response.getcode() == 200:
+                return jsonify(icon=favicon_url)
+        except Exception:
+            pass
+        
+        # 2. Essayer de parser la page HTML pour trouver l'icône
+        try:
+            req = Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0 FabHome/1.0')
+            response = urlopen(req, timeout=3, context=ctx)
+            html = response.read(50000).decode('utf-8', errors='ignore')
+            
+            # Chercher les balises link avec rel="icon" ou rel="shortcut icon"
+            import re
+            # Chercher <link rel="icon" href="..."> ou similaire
+            patterns = [
+                r'<link[^>]*rel=["\'](?:shortcut )?icon["\'][^>]*href=["\'](.*?)["\']',
+                r'<link[^>]*href=["\'](.*?)["\'][^>]*rel=["\'](?:shortcut )?icon["\']',
+            ]
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, html, re.IGNORECASE)
+                if matches:
+                    icon_path = matches[0]
+                    # Construire l'URL complète
+                    if icon_path.startswith('http'):
+                        return jsonify(icon=icon_path)
+                    elif icon_path.startswith('//'):
+                        return jsonify(icon=f"{parsed.scheme}:{icon_path}")
+                    elif icon_path.startswith('/'):
+                        return jsonify(icon=f"{parsed.scheme}://{domain}{icon_path}")
+                    else:
+                        return jsonify(icon=f"{parsed.scheme}://{domain}/{icon_path}")
+        except Exception:
+            pass
+        
+        # 3. Fallback: Google favicon service (plus fiable pour la plupart des sites)
+        return jsonify(icon=f'https://www.google.com/s2/favicons?domain={domain}&sz=64')
+        
+    except Exception as e:
+        logger.debug(f"Erreur récupération favicon: {e}")
         return jsonify(error='Erreur'), 400
 
 
@@ -423,25 +650,48 @@ def api_status():
 
 
 def _ping(url):
+    """Vérifie si une URL est accessible. Retourne 'up', 'down' ou 'unknown'."""
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     try:
         parsed = urlparse(url)
         if parsed.scheme not in ('http', 'https'):
-            return 'down'
-        req = Request(url, method='HEAD')
-        req.add_header('User-Agent', 'FabHome/1.0')
-        urlopen(req, timeout=5, context=ctx)
-        return 'up'
-    except Exception:
+            return 'unknown'
+        
+        # Essayer HEAD en premier
+        try:
+            req = Request(url, method='HEAD')
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) FabHome/1.0')
+            req.add_header('Accept', '*/*')
+            response = urlopen(req, timeout=8, context=ctx)
+            # Codes 2xx et 3xx sont considérés comme "up"
+            if 200 <= response.getcode() < 400:
+                return 'up'
+        except Exception:
+            pass
+        
+        # Si HEAD échoue, essayer GET avec lecture limitée
         try:
             req = Request(url)
-            req.add_header('User-Agent', 'FabHome/1.0')
-            urlopen(req, timeout=5, context=ctx)
-            return 'up'
-        except Exception:
-            return 'down'
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) FabHome/1.0')
+            req.add_header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+            response = urlopen(req, timeout=8, context=ctx)
+            # Lire seulement les premiers octets pour vérifier
+            response.read(512)
+            if 200 <= response.getcode() < 400:
+                return 'up'
+        except Exception as e:
+            # Si c'est une erreur de timeout ou connexion, c'est vraiment down
+            if 'timed out' in str(e).lower() or 'Connection refused' in str(e):
+                return 'down'
+            # Pour d'autres erreurs (SSL, format, etc.), on ne sait pas vraiment
+            return 'unknown'
+        
+        return 'down'
+    except Exception as e:
+        logger.debug(f"Erreur ping {url}: {e}")
+        return 'unknown'
 
 
 # ── API : Météo ───────────────────────────────────────────
