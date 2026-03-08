@@ -90,8 +90,6 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
-        CREATE INDEX IF NOT EXISTS idx_pages_profile ON pages(profile_id);
-        CREATE INDEX IF NOT EXISTS idx_widgets_profile ON widgets(profile_id);
     ''')
 
     # ── Migrations ────────────────────────────────────────
@@ -132,6 +130,9 @@ def init_db():
     if 'page_id' not in cols:
         conn.execute('ALTER TABLE groups_ ADD COLUMN page_id INTEGER NOT NULL DEFAULT 1')
 
+    # Les index dépendants de profile_id doivent être créés après migration.
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_pages_profile ON pages(profile_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_widgets_profile ON widgets(profile_id)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_groups_page ON groups_(page_id)')
 
     needs_placement = 'grid_row' not in cols
