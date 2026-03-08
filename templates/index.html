@@ -40,95 +40,150 @@
     </div>
     {% endif %}
 
-    <!-- ═══ GRILLE DE GROUPES ═══ -->
-    <div class="groups-grid" id="groupsGrid">
-        {% for group in groups %}
-        <div class="group-card"
-             data-group-id="{{ group.id }}"
-             style="grid-column: span {{ group.col_span }}">
-            <!-- Contrôles d'édition (groupe) -->
-            <div class="edit-overlay group-overlay">
-                <button class="ov-btn drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></button>
-                <button class="ov-btn" title="Modifier" data-action="edit-group"
-                        data-id="{{ group.id }}"><i class="bi bi-pencil"></i></button>
-                <button class="ov-btn ov-danger" title="Supprimer" data-action="delete-group"
-                        data-id="{{ group.id }}" data-name="{{ group.name }}"><i class="bi bi-trash"></i></button>
-            </div>
+    <!-- ═══ CONTENEUR (grille + palette) ═══ -->
+    <div class="main-container">
 
-            <div class="group-header">
-                {% if group.icon.startswith('http') %}
-                <img src="{{ group.icon }}" class="group-icon-img" alt="">
-                {% elif group.icon|length <= 2 %}
-                <span class="group-icon-emoji">{{ group.icon }}</span>
-                {% else %}
-                <i class="bi {{ group.icon }}"></i>
-                {% endif %}
-                <span>{{ group.name }}</span>
-            </div>
+        <!-- GRILLE DE GROUPES -->
+        <div class="grid-board" id="gridBoard"
+             style="--grid-cols: {{ settings.get('grid_cols', '4') }}; --grid-rows: {{ settings.get('grid_rows', '3') }};">
 
-            <div class="group-links" data-group-id="{{ group.id }}">
-                {% for link in group.links %}
-                <div class="link-wrap" data-link-id="{{ link.id }}">
-                    <a href="{{ link.url }}" class="link-item" target="_blank" rel="noopener noreferrer">
-                        <div class="link-icon">
-                            {% if link.icon.startswith('http') %}
-                            <img src="{{ link.icon }}" alt="">
-                            {% elif link.icon|length <= 2 %}
-                            <span>{{ link.icon }}</span>
-                            {% else %}
-                            <i class="bi {{ link.icon }}"></i>
-                            {% endif %}
-                        </div>
-                        <div class="link-info">
-                            <div class="link-name">{{ link.name }}</div>
-                            {% if link.description %}
-                            <div class="link-desc">{{ link.description }}</div>
-                            {% endif %}
-                        </div>
-                        {% if link.check_status %}
-                        <span class="status-dot" data-status-id="{{ link.id }}"></span>
-                        {% endif %}
-                    </a>
-                    <!-- Contrôles d'édition (lien) -->
-                    <div class="edit-overlay link-overlay">
-                        <button class="ov-btn ov-sm link-drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></button>
-                        <button class="ov-btn ov-sm" title="Modifier" data-action="edit-link"
-                                data-id="{{ link.id }}"><i class="bi bi-pencil"></i></button>
-                        <button class="ov-btn ov-sm ov-danger" title="Supprimer" data-action="delete-link"
-                                data-id="{{ link.id }}" data-name="{{ link.name }}"><i class="bi bi-trash"></i></button>
-                    </div>
+            {% for group in groups if group.grid_row >= 0 %}
+            <div class="group-card"
+                 data-group-id="{{ group.id }}"
+                 draggable="false"
+                 style="grid-column: {{ group.grid_col + 1 }} / span {{ group.col_span }}; grid-row: {{ group.grid_row + 1 }} / span {{ group.row_span }};">
+
+                <div class="edit-overlay group-overlay">
+                    <button class="ov-btn drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></button>
+                    <button class="ov-btn" title="Modifier" data-action="edit-group"
+                            data-id="{{ group.id }}"><i class="bi bi-pencil"></i></button>
+                    <button class="ov-btn ov-warning" title="Retirer de la grille" data-action="unplace-group"
+                            data-id="{{ group.id }}"><i class="bi bi-arrow-bar-right"></i></button>
+                    <button class="ov-btn ov-danger" title="Supprimer" data-action="delete-group"
+                            data-id="{{ group.id }}" data-name="{{ group.name }}"><i class="bi bi-trash"></i></button>
                 </div>
-                {% endfor %}
+
+                <div class="group-header">
+                    {% if group.icon.startswith('http') %}
+                    <img src="{{ group.icon }}" class="group-icon-img" alt="">
+                    {% elif group.icon|length <= 2 %}
+                    <span class="group-icon-emoji">{{ group.icon }}</span>
+                    {% else %}
+                    <i class="bi {{ group.icon }}"></i>
+                    {% endif %}
+                    <span>{{ group.name }}</span>
+                </div>
+
+                <div class="group-links" data-group-id="{{ group.id }}">
+                    {% for link in group.links %}
+                    <div class="link-wrap" data-link-id="{{ link.id }}" draggable="false">
+                        <a href="{{ link.url }}" class="link-item" target="_blank" rel="noopener noreferrer">
+                            <div class="link-icon">
+                                {% if link.icon.startswith('http') %}
+                                <img src="{{ link.icon }}" alt="">
+                                {% elif link.icon|length <= 2 %}
+                                <span>{{ link.icon }}</span>
+                                {% else %}
+                                <i class="bi {{ link.icon }}"></i>
+                                {% endif %}
+                            </div>
+                            <div class="link-info">
+                                <div class="link-name">{{ link.name }}</div>
+                                {% if link.description %}
+                                <div class="link-desc">{{ link.description }}</div>
+                                {% endif %}
+                            </div>
+                            {% if link.check_status %}
+                            <span class="status-dot" data-status-id="{{ link.id }}"></span>
+                            {% endif %}
+                        </a>
+                        <div class="edit-overlay link-overlay">
+                            <button class="ov-btn ov-sm link-drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></button>
+                            <button class="ov-btn ov-sm" title="Modifier" data-action="edit-link"
+                                    data-id="{{ link.id }}"><i class="bi bi-pencil"></i></button>
+                            <button class="ov-btn ov-sm ov-danger" title="Supprimer" data-action="delete-link"
+                                    data-id="{{ link.id }}" data-name="{{ link.name }}"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button class="btn-add-link edit-only" data-action="new-link" data-group-id="{{ group.id }}">
+                    <i class="bi bi-plus"></i> Ajouter un lien
+                </button>
+            </div>
+            {% endfor %}
+
+            <!-- Highlight de snap (invisible par défaut) -->
+            <div class="grid-highlight" id="gridHighlight"></div>
+        </div>
+
+        <!-- PALETTE (mode édition) -->
+        <aside class="edit-palette edit-only" id="editPalette">
+            <div class="palette-header">
+                <i class="bi bi-grid-3x3-gap"></i> Édition
             </div>
 
-            <!-- Bouton ajouter lien (edit mode) -->
-            <button class="btn-add-link edit-only" data-action="new-link" data-group-id="{{ group.id }}">
-                <i class="bi bi-plus"></i> Ajouter un lien
-            </button>
-        </div>
-        {% endfor %}
+            <div class="palette-section">
+                <div class="palette-label">Taille de la grille</div>
+                <div class="grid-size-ctrl">
+                    <label>Col</label>
+                    <input type="number" id="gridColsInput" min="2" max="8"
+                           value="{{ settings.get('grid_cols', '4') }}" class="form-control form-control-sm">
+                </div>
+                <div class="grid-size-ctrl">
+                    <label>Lig</label>
+                    <input type="number" id="gridRowsInput" min="1" max="12"
+                           value="{{ settings.get('grid_rows', '3') }}" class="form-control form-control-sm">
+                </div>
+                <button class="btn btn-sm btn-outline-light w-100 mt-2" id="applyGridSize">
+                    <i class="bi bi-check-lg"></i> Appliquer
+                </button>
+            </div>
 
-        <!-- Carte fantôme "+Nouveau groupe" (edit mode) -->
-        <div class="group-card add-group-ghost edit-only" data-action="new-group">
-            <i class="bi bi-plus-lg"></i>
-            <span>Nouveau groupe</span>
-        </div>
+            <div class="palette-section">
+                <button class="btn-palette" data-action="new-group">
+                    <i class="bi bi-plus-lg"></i> Nouveau groupe
+                </button>
+            </div>
+
+            <div class="palette-section" id="unplacedSection" style="display:none">
+                <div class="palette-label">Non placés</div>
+                <div id="unplacedList">
+                    {% for group in groups if group.grid_row < 0 %}
+                    <div class="palette-block" draggable="true" data-group-id="{{ group.id }}">
+                        {% if group.icon.startswith('http') %}
+                        <img src="{{ group.icon }}" class="palette-block-icon" alt="">
+                        {% elif group.icon|length <= 2 %}
+                        <span>{{ group.icon }}</span>
+                        {% else %}
+                        <i class="bi {{ group.icon }}"></i>
+                        {% endif %}
+                        <span>{{ group.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="palette-section mt-auto">
+                <button class="btn-palette btn-palette-muted" data-action="open-settings">
+                    <i class="bi bi-gear"></i> Réglages
+                </button>
+            </div>
+        </aside>
+
     </div>
 
     {% if not groups %}
     <div class="empty-state" id="emptyState">
         <i class="bi bi-house-add"></i>
-        <p>Bienvenue ! Cliquez sur le <strong>crayon</strong> en bas à droite<br>pour commencer à personnaliser votre page.</p>
+        <p>Bienvenue ! Cliquez sur le <strong>crayon</strong> en bas à droite<br>pour personnaliser votre page.</p>
     </div>
     {% endif %}
 
-    <!-- ═══ BOUTONS FLOTTANTS ═══ -->
+    <!-- FAB toggle -->
     <button class="fab edit-toggle" id="editToggle" title="Mode édition">
         <i class="bi bi-pencil" id="editToggleIcon"></i>
-    </button>
-    <button class="fab settings-fab edit-only" id="settingsBtn" title="Réglages"
-            data-action="open-settings">
-        <i class="bi bi-gear-fill"></i>
     </button>
 </div>
 
@@ -177,13 +232,23 @@
                             <span class="ig" data-v="bi-heart"><i class="bi bi-heart"></i></span>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Largeur</label>
-                        <select class="form-select" name="col_span">
-                            <option value="1">1 colonne</option>
-                            <option value="2">2 colonnes</option>
-                            <option value="3">3 colonnes</option>
-                        </select>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Largeur</label>
+                            <select class="form-select" name="col_span">
+                                <option value="1">1 col</option>
+                                <option value="2">2 col</option>
+                                <option value="3">3 col</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Hauteur</label>
+                            <select class="form-select" name="row_span">
+                                <option value="1">1 lig</option>
+                                <option value="2">2 lig</option>
+                                <option value="3">3 lig</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -247,7 +312,7 @@
                     </div>
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" name="check_status" id="chkStatus">
-                        <label class="form-check-label" for="chkStatus">Surveiller le statut (en ligne / hors ligne)</label>
+                        <label class="form-check-label" for="chkStatus">Surveiller le statut</label>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -296,7 +361,6 @@
                                 <input type="url" class="form-control" name="background_url"
                                        value="{{ settings.get('background_url', '') }}"
                                        placeholder="https://exemple.com/fond.jpg">
-                                <div class="form-text">Laissez vide pour le fond par défaut.</div>
                             </div>
                         </div>
                         <div class="tab-pane fade" id="stWidgets">
@@ -305,7 +369,6 @@
                             {% set ws = widgets.get('search', {}) %}
                             {% set ww = widgets.get('weather', {}) %}
                             {% set wwc = ww.config if ww and ww.config else {} %}
-                            <!-- Accueil -->
                             <div class="settings-widget-row">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <strong><i class="bi bi-chat-quote"></i> Message d'accueil</strong>
@@ -317,7 +380,6 @@
                                 <input type="text" class="form-control form-control-sm mt-2" name="greeting_name"
                                        value="{{ settings.get('greeting_name', '') }}" placeholder="Votre prénom">
                             </div>
-                            <!-- Horloge -->
                             <div class="settings-widget-row">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <strong><i class="bi bi-clock"></i> Horloge</strong>
@@ -327,7 +389,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- Recherche -->
                             <div class="settings-widget-row">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <strong><i class="bi bi-search"></i> Barre de recherche</strong>
@@ -344,7 +405,6 @@
                                     <option value="startpage" {% if sp=='startpage' %}selected{% endif %}>Startpage</option>
                                 </select>
                             </div>
-                            <!-- Météo -->
                             <div class="settings-widget-row">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <strong><i class="bi bi-cloud-sun"></i> Météo</strong>
@@ -379,8 +439,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- ═══ DONNÉES JSON + SCRIPTS ═══ -->
+{% block extra_js %}
 <script>
 const PAGE_DATA = {
     settings: {{ settings | tojson }},

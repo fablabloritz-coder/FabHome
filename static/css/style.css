@@ -1,4 +1,4 @@
-/* FabHome — Styles globaux + mode édition */
+/* FabHome — Styles globaux + grille configurable + mode édition */
 
 :root { --fh-accent: #ff6b35; --fh-accent-glow: rgba(255,107,53,0.35); }
 
@@ -37,7 +37,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 4rem;
     background: var(--fh-bg-gradient);
     background-color: var(--fh-bg);
     background-size: cover;
@@ -52,7 +52,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
 .widgets-bar {
     display: flex; flex-direction: column;
     align-items: center; gap: 0.5rem;
-    margin-bottom: 2rem; width: 100%; max-width: 800px;
+    margin-bottom: 1.5rem; width: 100%; max-width: 800px;
 }
 .widget-greeting h1 { font-size: 2rem; font-weight: 300; text-align: center; margin: 0; }
 .widget-clock { text-align: center; }
@@ -69,7 +69,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
 /* ══════════════════════════════════════════
    BARRE DE RECHERCHE
    ══════════════════════════════════════════ */
-.search-bar { width: 100%; max-width: 600px; margin-bottom: 2.5rem; }
+.search-bar { width: 100%; max-width: 600px; margin-bottom: 2rem; }
 .search-form .input-group {
     border-radius: 16px; overflow: hidden;
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
@@ -86,15 +86,29 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
 .search-form .form-control::placeholder { color: var(--fh-text-muted); }
 
 /* ══════════════════════════════════════════
-   GRILLE DE GROUPES
+   CONTENEUR PRINCIPAL (grille + palette)
    ══════════════════════════════════════════ */
-.groups-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+.main-container {
+    display: flex;
     gap: 1.5rem;
-    width: 100%; max-width: 1200px;
+    width: 100%;
+    max-width: 1400px;
 }
 
+/* ══════════════════════════════════════════
+   GRILLE DE GROUPES
+   ══════════════════════════════════════════ */
+.grid-board {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-cols, 4), 1fr);
+    grid-template-rows: repeat(var(--grid-rows, 3), minmax(120px, auto));
+    gap: 1rem;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+/* ── Carte de groupe ──────────────────── */
 .group-card {
     position: relative;
     background: var(--fh-card-bg);
@@ -103,7 +117,8 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     padding: 1rem 1.25rem;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.15s, box-shadow 0.15s, outline 0.2s;
+    transition: transform 0.15s, box-shadow 0.15s;
+    overflow: hidden;
 }
 .group-card:hover {
     transform: translateY(-2px);
@@ -114,7 +129,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     font-weight: 600; font-size: 0.8rem;
     text-transform: uppercase; letter-spacing: 0.8px;
     color: var(--fh-text-muted);
-    padding-bottom: 0.75rem; margin-bottom: 0.25rem;
+    padding-bottom: 0.6rem; margin-bottom: 0.25rem;
     border-bottom: 1px solid var(--fh-card-border);
     display: flex; align-items: center; gap: 0.5rem;
 }
@@ -132,27 +147,27 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
 
 .link-item {
     display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.55rem 0.5rem; border-radius: 10px;
+    padding: 0.5rem 0.5rem; border-radius: 10px;
     text-decoration: none; color: var(--fh-text);
     transition: background 0.15s;
 }
 .link-item:hover { background: rgba(255,107,53,0.08); color: var(--fh-text); }
 
 .link-icon {
-    width: 2.4rem; height: 2.4rem;
+    width: 2.2rem; height: 2.2rem;
     display: flex; align-items: center; justify-content: center;
     border-radius: 10px; background: rgba(255,107,53,0.1);
-    font-size: 1.15rem; color: var(--fh-accent); flex-shrink: 0;
+    font-size: 1.05rem; color: var(--fh-accent); flex-shrink: 0;
 }
-.link-icon img { width: 1.4rem; height: 1.4rem; object-fit: contain; }
+.link-icon img { width: 1.3rem; height: 1.3rem; object-fit: contain; }
 
 .link-info { flex: 1; min-width: 0; }
 .link-name {
-    font-weight: 500; font-size: 0.92rem;
+    font-weight: 500; font-size: 0.88rem;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .link-desc {
-    font-size: 0.75rem; color: var(--fh-text-muted);
+    font-size: 0.72rem; color: var(--fh-text-muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -170,10 +185,149 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     text-align: center; color: var(--fh-text-muted); padding: 4rem 1rem;
 }
 .empty-state i { font-size: 4rem; margin-bottom: 1rem; display: block; }
-.empty-state a { color: var(--fh-accent); }
 
 /* ══════════════════════════════════════════
-   BOUTONS FLOTTANTS (FAB)
+   CELLULES VIDES DE LA GRILLE (edit mode)
+   ══════════════════════════════════════════ */
+.grid-cell-empty {
+    border: 2px dashed var(--fh-card-border);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fh-text-muted);
+    font-size: 1.4rem;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all 0.2s;
+    min-height: 120px;
+}
+.grid-cell-empty:hover {
+    border-color: var(--fh-accent);
+    color: var(--fh-accent);
+    opacity: 1;
+    background: rgba(255,107,53,0.04);
+}
+
+/* ══════════════════════════════════════════
+   HIGHLIGHT SNAP (grille)
+   ══════════════════════════════════════════ */
+.grid-highlight {
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+    border: 3px solid var(--fh-accent);
+    background: rgba(255,107,53,0.12);
+    border-radius: 14px;
+    transition: opacity 0.1s, grid-column 0.1s, grid-row 0.1s;
+    grid-column: 1 / span 1;
+    grid-row: 1 / span 1;
+}
+.grid-highlight.visible {
+    opacity: 1;
+}
+.grid-highlight.invalid {
+    border-color: #ef476f;
+    background: rgba(239,71,111,0.12);
+}
+
+/* ══════════════════════════════════════════
+   PALETTE (barre latérale d'édition)
+   ══════════════════════════════════════════ */
+.edit-palette {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--fh-card-bg);
+    border: 1px solid var(--fh-card-border);
+    border-radius: 16px;
+    padding: 1rem;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: calc(100vh - 180px);
+    position: sticky;
+    top: 2rem;
+    overflow-y: auto;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.palette-header {
+    font-weight: 600; font-size: 0.9rem;
+    color: var(--fh-text);
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--fh-card-border);
+    display: flex; align-items: center; gap: 0.5rem;
+}
+
+.palette-section {
+    padding-top: 0.5rem;
+}
+
+.palette-label {
+    font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--fh-text-muted);
+    margin-bottom: 0.4rem;
+}
+
+.grid-size-ctrl {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+.grid-size-ctrl label {
+    font-size: 0.8rem; color: var(--fh-text-muted);
+    width: 28px; flex-shrink: 0;
+}
+.grid-size-ctrl .form-control {
+    background: var(--fh-card-bg); border-color: var(--fh-card-border);
+    color: var(--fh-text); text-align: center;
+}
+
+.btn-palette {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    border: 1px dashed var(--fh-accent);
+    background: transparent;
+    color: var(--fh-accent);
+    font-size: 0.85rem; font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+    transition: all 0.15s;
+}
+.btn-palette:hover {
+    background: rgba(255,107,53,0.1);
+}
+.btn-palette-muted {
+    border-color: var(--fh-card-border);
+    color: var(--fh-text-muted);
+}
+.btn-palette-muted:hover {
+    border-color: var(--fh-text-muted);
+    background: var(--fh-edit-handle);
+}
+
+/* ── Blocs non placés dans la palette ─── */
+.palette-block {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--fh-card-border);
+    border-radius: 10px;
+    background: var(--fh-card-bg);
+    margin-bottom: 0.4rem;
+    font-size: 0.82rem; color: var(--fh-text);
+    cursor: grab;
+    transition: all 0.15s;
+}
+.palette-block:hover {
+    border-color: var(--fh-accent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.palette-block.dragging { opacity: 0.4; }
+.palette-block-icon { width: 1rem; height: 1rem; object-fit: contain; }
+
+/* ══════════════════════════════════════════
+   BOUTON FLOTTANT (FAB)
    ══════════════════════════════════════════ */
 .fab {
     position: fixed; z-index: 100;
@@ -196,12 +350,6 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     box-shadow: 0 6px 24px rgba(74,144,217,0.4);
 }
 
-.settings-fab {
-    bottom: 1.5rem; right: 5rem;
-    background: #6c757d; opacity: 0.85;
-}
-.settings-fab:hover { opacity: 1; }
-
 /* ══════════════════════════════════════════
    MODE ÉDITION
    ══════════════════════════════════════════ */
@@ -213,39 +361,40 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
 body.edit-mode .edit-overlay { display: flex !important; }
 body.edit-mode .edit-only { display: flex !important; }
 
-/* Liens non-cliquables en mode édition */
+/* Liens non cliquables en mode édition */
 body.edit-mode .link-item { pointer-events: none; }
 
-/* Contour des cartes */
-body.edit-mode .group-card:not(.add-group-ghost) {
+/* Contour des cartes sur la grille */
+body.edit-mode .group-card {
     outline: 2px dashed var(--fh-edit-outline);
-    outline-offset: 4px;
+    outline-offset: 2px;
 }
 
-/* ── Overlay boutons sur les groupes ──── */
+/* ── Overlay boutons groupe ───────────── */
 .group-overlay {
     position: absolute; top: -12px; right: 8px;
     gap: 4px; z-index: 10;
 }
 
 .ov-btn {
-    width: 28px; height: 28px;
+    width: 26px; height: 26px;
     border-radius: 6px; border: none;
     background: var(--fh-edit-handle);
     color: var(--fh-text-muted);
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 0.85rem;
+    cursor: pointer; font-size: 0.8rem;
     transition: background 0.15s, color 0.15s;
     backdrop-filter: blur(8px);
 }
 .ov-btn:hover { background: var(--fh-accent); color: #fff; }
 .ov-btn.ov-danger:hover { background: #ef476f; }
-.ov-btn.ov-sm { width: 24px; height: 24px; font-size: 0.75rem; }
+.ov-btn.ov-warning:hover { background: #ffc107; color: #333; }
+.ov-btn.ov-sm { width: 22px; height: 22px; font-size: 0.72rem; }
 
 .drag-handle { cursor: grab; }
 .drag-handle:active { cursor: grabbing; }
 
-/* ── Overlay boutons sur les liens ────── */
+/* ── Overlay boutons lien ─────────────── */
 .link-overlay {
     position: absolute; top: 50%; right: 6px;
     transform: translateY(-50%);
@@ -254,59 +403,30 @@ body.edit-mode .group-card:not(.add-group-ghost) {
 
 /* ── Bouton ajouter lien ──────────────── */
 .btn-add-link {
-    width: 100%; margin-top: 0.5rem;
-    padding: 0.4rem; border-radius: 8px;
+    width: 100%; margin-top: 0.4rem;
+    padding: 0.35rem; border-radius: 8px;
     border: 1px dashed var(--fh-card-border);
     background: transparent; color: var(--fh-text-muted);
-    cursor: pointer; font-size: 0.8rem;
+    cursor: pointer; font-size: 0.78rem;
     transition: all 0.15s;
     justify-content: center; align-items: center; gap: 0.3rem;
 }
 .btn-add-link:hover { border-color: var(--fh-accent); color: var(--fh-accent); }
 
-/* ── Carte fantôme "nouveau groupe" ───── */
-.add-group-ghost {
-    border: 2px dashed var(--fh-card-border);
-    background: transparent;
-    cursor: pointer;
-    flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 0.5rem; min-height: 120px;
-    color: var(--fh-text-muted); font-size: 0.9rem;
-    transition: border-color 0.2s, color 0.2s;
-}
-.add-group-ghost:hover {
-    border-color: var(--fh-accent); color: var(--fh-accent);
-    transform: none; box-shadow: none;
-}
-.add-group-ghost i { font-size: 2rem; }
-
-/* ── DnD : état de drag ──────────────── */
-.group-card.dragging {
-    opacity: 0.4;
-    outline-color: var(--fh-accent) !important;
-}
-.group-card.drag-over {
-    outline-color: var(--fh-accent) !important;
-    outline-style: solid !important;
-    outline-width: 3px !important;
-}
+/* ── DnD états ────────────────────────── */
+.group-card.dragging { opacity: 0.3; }
 
 .link-wrap.dragging { opacity: 0.4; }
-.link-wrap.drag-over-link {
-    border-top: 2px solid var(--fh-accent);
-}
+.link-wrap.drag-over-link { border-top: 2px solid var(--fh-accent); }
 
 /* ══════════════════════════════════════════
    MODALES extras
    ══════════════════════════════════════════ */
-.icon-grid {
-    display: flex; flex-wrap: wrap; gap: 4px;
-}
+.icon-grid { display: flex; flex-wrap: wrap; gap: 4px; }
 .ig {
-    width: 36px; height: 36px;
+    width: 34px; height: 34px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; cursor: pointer;
+    font-size: 1rem; cursor: pointer;
     border: 1px solid var(--bs-border-color); border-radius: 6px;
     background: var(--bs-tertiary-bg); transition: all 0.15s;
 }
@@ -322,17 +442,34 @@ body.edit-mode .group-card:not(.add-group-ghost) {
    RESPONSIVE
    ══════════════════════════════════════════ */
 @media (max-width: 768px) {
-    .homepage { padding: 1.5rem 1rem 3rem; }
+    .homepage { padding: 1.5rem 0.75rem 3rem; }
     .widget-greeting h1 { font-size: 1.4rem; }
     .clock-time { font-size: 2.5rem; }
-    .groups-grid { grid-template-columns: 1fr; gap: 1rem; }
-    .group-card { grid-column: span 1 !important; }
-    .search-bar { margin-bottom: 1.5rem; }
+
+    .main-container { flex-direction: column; }
+
+    .grid-board {
+        --grid-cols: 2 !important;
+        gap: 0.75rem;
+    }
+    .group-card { grid-column: span 1 !important; grid-row: span 1 !important; }
+
+    .edit-palette {
+        width: 100%;
+        max-height: none;
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        order: -1;
+    }
+    .palette-section { padding-top: 0; }
+    .palette-header { border-bottom: none; padding-bottom: 0; }
+
     .fab { width: 42px; height: 42px; font-size: 1.1rem; }
     .edit-toggle { bottom: 1rem; right: 1rem; }
-    .settings-fab { bottom: 1rem; right: 4rem; }
 }
 
-@media (min-width: 1400px) {
-    .groups-grid { grid-template-columns: repeat(4, 1fr); }
+@media (min-width: 1600px) {
+    .main-container { max-width: 1600px; }
 }

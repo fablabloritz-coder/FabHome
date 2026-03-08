@@ -1,4 +1,4 @@
-/* FabHome — Logique unifiée : affichage + mode édition + CRUD + DnD */
+/* FabHome — Logique : grille configurable, DnD avec snap, CRUD, widgets */
 
 (function () {
     'use strict';
@@ -6,6 +6,7 @@
     /* ══════════════════════════════════════
        HELPERS
        ══════════════════════════════════════ */
+
     function api(method, url, body) {
         var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify(body);
@@ -19,7 +20,6 @@
     function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
     function qsa(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
 
-    // Trouver les données d'un groupe/lien dans PAGE_DATA
     function findGroup(id) {
         return PAGE_DATA.groups.find(function (g) { return g.id === id; });
     }
@@ -31,6 +31,96 @@
             }
         }
         return null;
+    }
+
+    /* ══════════════════════════════════════
+       ÉTAT DE LA GRILLE
+       ══════════════════════════════════════ */
+
+    var gridBoard = qs('#gridBoard');
+    var highlight = qs('#gridHighlight');
+    var gridCols = parseInt(PAGE_DATA.settings.grid_cols) || 4;
+    var gridRows = parseInt(PAGE_DATA.settings.grid_rows) || 3;
+    var occupiedMap = {}; // "row,col" → groupId
+
+    function buildOccupiedMap() {
+        occupiedMap = {};
+        PAGE_DATA.groups.forEach(function (g) {
+            if (g.grid_row < 0) return;
+            for (var r = g.grid_row; r < g.grid_row + (g.row_span || 1); r++) {
+                for (var c = g.grid_col; c < g.grid_col + (g.col_span || 1); c++) {
+                    occupiedMap[r + ',' + c] = g.id;
+                }
+            }
+        });
+    }
+
+    function canPlace(row, col, colSpan, rowSpan, excludeId) {
+        if (col < 0 || row < 0 || col + colSpan > gridCols || row + rowSpan > gridRows) return false;
+        for (var r = row; r < row + rowSpan; r++) {
+            for (var c = col; c < col + colSpan; c++) {
+                var key = r + ',' + c;
+                if (occupiedMap[key] && occupiedMap[key] !== excludeId) return false;
+            }
+        }
+        return true;
+    }
+
+    function getCellFromPoint(x, y) {
+        if (!gridBoard) return null;
+        var rect = gridBoard.getBoundingClientRect();
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
+        var cellW = rect.width / gridCols;
+        var cellH = rect.height / gridRows;
+        var col = Math.floor((x - rect.left) / cellW);
+        var row = Math.floor((y - rect.top) / cellH);
+        return {
+            row: Math.max(0, Math.min(gridRows - 1, row)),
+            col: Math.max(0, Math.min(gridCols - 1, col))
+        };
+    }
+
+    /* ══════════════════════════════════════
+       CELLULES VIDES (mode édition)
+       ══════════════════════════════════════ */
+
+    var pendingPosition = null;
+
+    function renderEmptyCells() {
+        qsa('.grid-cell-empty', gridBoard).forEach(function (e) { e.remove(); });
+        if (!editMode || !gridBoard) return;
+        buildOccupiedMap();
+        for (var r = 0; r < gridRows; r++) {
+            for (var c = 0; c < gridCols; c++) {
+                if (!occupiedMap[r + ',' + c]) {
+                    var cell = document.createElement('div');
+                    cell.className = 'grid-cell-empty';
+                    cell.style.gridColumn = (c + 1) + ' / span 1';
+                    cell.style.gridRow = (r + 1) + ' / span 1';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.innerHTML = '<i class="bi bi-plus"></i>';
+                    cell.addEventListener('click', onEmptyCellClick);
+                    gridBoard.appendChild(cell);
+                }
+            }
+        }
+    }
+
+    function onEmptyCellClick() {
+        pendingPosition = {
+            row: parseInt(this.dataset.row),
+            col: parseInt(this.dataset.col)
+        };
+        openGroupModal(null);
+    }
+
+    function updateUnplacedSection() {
+        var section = qs('#unplacedSection');
+        var list = qs('#unplacedList');
+        if (!section || !list) return;
+        var unplaced = PAGE_DATA.groups.filter(function (g) { return g.grid_row < 0; });
+        section.style.display = unplaced.length > 0 ? '' : 'none';
     }
 
     /* ══════════════════════════════════════
@@ -53,7 +143,7 @@
         var h = new Date().getHours();
         var g = h >= 5 && h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir';
         var name = PAGE_DATA.settings.greeting_name;
-        el.textContent = g + (name ? ', ' + name : '') + ' 👋';
+        el.textContent = g + (name ? ', ' + name : '') + ' \uD83D\uDC4B';
     }
 
     function loadWeather() {
@@ -86,14 +176,14 @@
             e.preventDefault();
             var q = qs('#search-input').value.trim();
             if (!q) return;
-            var p = {
+            var providers = {
                 google: 'https://www.google.com/search?q=',
                 duckduckgo: 'https://duckduckgo.com/?q=',
                 bing: 'https://www.bing.com/search?q=',
                 startpage: 'https://www.startpage.com/sp/search?query='
             };
             var sp = PAGE_DATA.settings.search_provider || 'google';
-            window.open((p[sp] || p.google) + encodeURIComponent(q), '_blank');
+            window.open((providers[sp] || providers.google) + encodeURIComponent(q), '_blank');
         });
     }
 
@@ -124,13 +214,12 @@
         if (editIcon) editIcon.className = on ? 'bi bi-check-lg' : 'bi bi-pencil';
 
         // Rendre les groupes glissables
-        qsa('.group-card:not(.add-group-ghost)').forEach(function (c) {
-            c.draggable = on;
-        });
-        // Rendre les liens glissables
-        qsa('.link-wrap').forEach(function (w) {
-            w.draggable = on;
-        });
+        qsa('.group-card').forEach(function (c) { c.draggable = on; });
+        qsa('.palette-block').forEach(function (b) { b.draggable = on; });
+
+        renderEmptyCells();
+        updateUnplacedSection();
+
         try { sessionStorage.setItem('fh_edit', on ? '1' : '0'); } catch (e) {}
     }
 
@@ -142,12 +231,23 @@
        MODALES
        ══════════════════════════════════════ */
 
-    var groupModal = qs('#groupModal') ? new bootstrap.Modal(qs('#groupModal')) : null;
-    var linkModal  = qs('#linkModal')  ? new bootstrap.Modal(qs('#linkModal'))  : null;
-    var settingsModal = qs('#settingsModal') ? new bootstrap.Modal(qs('#settingsModal')) : null;
+    var groupModal = null;
+    var linkModal = null;
+    var settingsModal = null;
+
+    function initModals() {
+        var gm = qs('#groupModal');
+        var lm = qs('#linkModal');
+        var sm = qs('#settingsModal');
+        if (gm && typeof bootstrap !== 'undefined') groupModal = new bootstrap.Modal(gm);
+        if (lm && typeof bootstrap !== 'undefined') linkModal = new bootstrap.Modal(lm);
+        if (sm && typeof bootstrap !== 'undefined') settingsModal = new bootstrap.Modal(sm);
+    }
 
     /* ── Groupe ───────────────────────── */
     function openGroupModal(groupId) {
+        if (!groupModal) { initModals(); }
+        if (!groupModal) return;
         var form = qs('#groupForm');
         var title = qs('#groupModalTitle');
         if (groupId) {
@@ -157,12 +257,14 @@
             form.elements.name.value = g ? g.name : '';
             form.elements.icon.value = g ? g.icon : 'bi-folder';
             form.elements.col_span.value = g ? g.col_span : 1;
+            form.elements.row_span.value = g ? (g.row_span || 1) : 1;
         } else {
             title.textContent = 'Nouveau groupe';
             delete form.dataset.editId;
             form.reset();
             form.elements.icon.value = 'bi-folder';
             form.elements.col_span.value = '1';
+            form.elements.row_span.value = '1';
         }
         groupModal.show();
     }
@@ -172,9 +274,20 @@
         groupForm.addEventListener('submit', function (e) {
             e.preventDefault();
             var f = e.target;
-            var body = { name: f.elements.name.value, icon: f.elements.icon.value,
-                         col_span: parseInt(f.elements.col_span.value) || 1 };
+            var body = {
+                name: f.elements.name.value,
+                icon: f.elements.icon.value,
+                col_span: parseInt(f.elements.col_span.value) || 1,
+                row_span: parseInt(f.elements.row_span.value) || 1
+            };
             var eid = f.dataset.editId;
+
+            if (!eid && pendingPosition) {
+                body.grid_row = pendingPosition.row;
+                body.grid_col = pendingPosition.col;
+                pendingPosition = null;
+            }
+
             var p = eid ? api('PUT', '/api/groups/' + eid, body)
                         : api('POST', '/api/groups', body);
             p.then(function () { location.href = '/?edit=1'; })
@@ -182,8 +295,18 @@
         });
     }
 
+    // Annuler la position en attente si le modal est fermé sans soumettre
+    var groupModalEl = qs('#groupModal');
+    if (groupModalEl) {
+        groupModalEl.addEventListener('hidden.bs.modal', function () {
+            pendingPosition = null;
+        });
+    }
+
     /* ── Lien ─────────────────────────── */
     function openLinkModal(linkId, groupId) {
+        if (!linkModal) { initModals(); }
+        if (!linkModal) return;
         var form = qs('#linkForm');
         var title = qs('#linkModalTitle');
         if (linkId) {
@@ -261,7 +384,7 @@
         });
     }
 
-    /* ── Icon picker (clic sur grille) ── */
+    /* ── Icon picker ──────────────────── */
     document.addEventListener('click', function (e) {
         var ig = e.target.closest('.ig');
         if (!ig) return;
@@ -273,105 +396,112 @@
     });
 
     /* ══════════════════════════════════════
-       DRAG & DROP — GROUPES
+       TAILLE DE LA GRILLE (palette)
        ══════════════════════════════════════ */
 
-    var grid = qs('#groupsGrid');
-    var draggedCard = null;
+    var applyBtn = qs('#applyGridSize');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function () {
+            var newCols = parseInt(qs('#gridColsInput').value) || 4;
+            var newRows = parseInt(qs('#gridRowsInput').value) || 3;
+            newCols = Math.max(2, Math.min(8, newCols));
+            newRows = Math.max(1, Math.min(12, newRows));
+            api('PUT', '/api/settings', { grid_cols: String(newCols), grid_rows: String(newRows) })
+                .then(function () { location.href = '/?edit=1'; })
+                .catch(function (err) { alert(err.message); });
+        });
+    }
 
-    if (grid) {
-        grid.addEventListener('dragstart', function (e) {
-            var card = e.target.closest('.group-card:not(.add-group-ghost)');
+    /* ══════════════════════════════════════
+       DRAG & DROP — GROUPES (grille + palette)
+       ══════════════════════════════════════ */
+
+    var draggingGroupId = null;
+    var draggingColSpan = 1;
+    var draggingRowSpan = 1;
+    var dragSource = null; // 'grid' | 'palette'
+    var draggedLink = null;
+
+    // Drag depuis la grille
+    if (gridBoard) {
+        gridBoard.addEventListener('dragstart', function (e) {
+            var card = e.target.closest('.group-card');
             if (!card || !editMode) return;
-            // Vérifier que c'est un drag de groupe (pas de lien)
             if (e.target.closest('.link-wrap')) return;
-            draggedCard = card;
+            draggingGroupId = parseInt(card.dataset.groupId);
+            var g = findGroup(draggingGroupId);
+            draggingColSpan = g ? (g.col_span || 1) : 1;
+            draggingRowSpan = g ? (g.row_span || 1) : 1;
+            dragSource = 'grid';
             card.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', 'group');
         });
 
-        grid.addEventListener('dragover', function (e) {
-            if (!draggedCard) return;
+        gridBoard.addEventListener('dragover', function (e) {
+            if (!draggingGroupId) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
 
-            // Trouver l'élément le plus proche pour insérer avant
-            var cards = qsa('.group-card:not(.dragging):not(.add-group-ghost)', grid);
-            var closest = null;
-            var closestDist = Infinity;
+            var cell = getCellFromPoint(e.clientX, e.clientY);
+            if (!cell || !highlight) return;
 
-            cards.forEach(function (c) {
-                var rect = c.getBoundingClientRect();
-                var cx = rect.left + rect.width / 2;
-                var cy = rect.top + rect.height / 2;
-                var dist = Math.hypot(e.clientX - cx, e.clientY - cy);
-                if (dist < closestDist) {
-                    closestDist = dist;
-                    closest = c;
-                }
-            });
+            var ok = canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, draggingGroupId);
+            highlight.style.gridColumn = (cell.col + 1) + ' / span ' + draggingColSpan;
+            highlight.style.gridRow = (cell.row + 1) + ' / span ' + draggingRowSpan;
+            highlight.classList.add('visible');
+            highlight.classList.toggle('invalid', !ok);
+        });
 
-            // Retirer les indicateurs
-            cards.forEach(function (c) { c.classList.remove('drag-over'); });
-
-            if (closest) {
-                var rect = closest.getBoundingClientRect();
-                var midX = rect.left + rect.width / 2;
-                var midY = rect.top + rect.height / 2;
-                // Déterminer si on insère avant ou après
-                var after = (e.clientY > midY) || (Math.abs(e.clientY - midY) < rect.height * 0.3 && e.clientX > midX);
-                if (after) {
-                    var next = closest.nextElementSibling;
-                    if (next && next !== draggedCard) {
-                        grid.insertBefore(draggedCard, next);
-                    } else if (!next) {
-                        var ghost = qs('.add-group-ghost', grid);
-                        if (ghost) grid.insertBefore(draggedCard, ghost);
-                    }
-                } else {
-                    if (closest !== draggedCard.nextElementSibling) {
-                        grid.insertBefore(draggedCard, closest);
-                    }
-                }
+        gridBoard.addEventListener('dragleave', function (e) {
+            if (!e.relatedTarget || !gridBoard.contains(e.relatedTarget)) {
+                if (highlight) highlight.classList.remove('visible');
             }
         });
 
-        grid.addEventListener('dragend', function () {
-            if (!draggedCard) return;
-            draggedCard.classList.remove('dragging');
-            qsa('.group-card', grid).forEach(function (c) { c.classList.remove('drag-over'); });
+        gridBoard.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (!draggingGroupId) return;
+            var cell = getCellFromPoint(e.clientX, e.clientY);
+            if (!cell) return;
+            var ok = canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, draggingGroupId);
+            if (!ok) return;
 
-            // Sauvegarder le nouvel ordre
-            var order = qsa('.group-card:not(.add-group-ghost)', grid).map(function (c) {
-                return parseInt(c.dataset.groupId);
-            }).filter(function (id) { return !isNaN(id); });
-
-            api('POST', '/api/groups/reorder', { order: order }).catch(function (err) {
-                console.error('Erreur reorder:', err);
-            });
-
-            draggedCard = null;
+            api('POST', '/api/groups/' + draggingGroupId + '/move', {
+                grid_row: cell.row,
+                grid_col: cell.col
+            }).then(function () {
+                location.href = '/?edit=1';
+            }).catch(function (err) { alert(err.message); });
         });
     }
 
-    /* ══════════════════════════════════════
-       DRAG & DROP — LIENS (dans un groupe)
-       ══════════════════════════════════════ */
-
-    var draggedLink = null;
-
+    // Drag depuis la palette (blocs non placés)
     document.addEventListener('dragstart', function (e) {
+        // Lien
         var wrap = e.target.closest('.link-wrap');
-        if (!wrap || !editMode) return;
-        // Empêcher le drag groupe
-        e.stopPropagation();
-        draggedLink = wrap;
-        wrap.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', 'link');
+        if (wrap && editMode) {
+            draggedLink = wrap;
+            wrap.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', 'link');
+            return;
+        }
+        // Palette block
+        var block = e.target.closest('.palette-block');
+        if (block && editMode) {
+            draggingGroupId = parseInt(block.dataset.groupId);
+            var g = findGroup(draggingGroupId);
+            draggingColSpan = g ? (g.col_span || 1) : 1;
+            draggingRowSpan = g ? (g.row_span || 1) : 1;
+            dragSource = 'palette';
+            block.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', 'group');
+        }
     });
 
+    // DnD liens dans un groupe
     document.addEventListener('dragover', function (e) {
         if (!draggedLink) return;
         var linksList = e.target.closest('.group-links');
@@ -397,24 +527,34 @@
         }
     });
 
+    // Nettoyage global dragend
     document.addEventListener('dragend', function () {
-        if (!draggedLink) return;
-        draggedLink.classList.remove('dragging');
-        qsa('.link-wrap').forEach(function (w) { w.classList.remove('drag-over-link'); });
-
-        // Trouver le groupe parent et sauver l'ordre
-        var linksList = draggedLink.closest('.group-links');
-        if (linksList) {
-            var groupId = parseInt(linksList.dataset.groupId);
-            var order = qsa('.link-wrap', linksList).map(function (w) {
-                return parseInt(w.dataset.linkId);
-            }).filter(function (id) { return !isNaN(id); });
-
-            api('POST', '/api/links/reorder', { group_id: groupId, order: order })
-                .catch(function (err) { console.error('Erreur reorder liens:', err); });
+        // Groupes
+        if (draggingGroupId) {
+            qsa('.group-card.dragging, .palette-block.dragging').forEach(function (el) {
+                el.classList.remove('dragging');
+            });
+            if (highlight) highlight.classList.remove('visible');
+            draggingGroupId = null;
+            dragSource = null;
         }
+        // Liens
+        if (draggedLink) {
+            draggedLink.classList.remove('dragging');
+            qsa('.link-wrap.drag-over-link').forEach(function (w) { w.classList.remove('drag-over-link'); });
 
-        draggedLink = null;
+            var linksList = draggedLink.closest('.group-links');
+            if (linksList) {
+                var groupId = parseInt(linksList.dataset.groupId);
+                var order = qsa('.link-wrap', linksList).map(function (w) {
+                    return parseInt(w.dataset.linkId);
+                }).filter(function (id) { return !isNaN(id); });
+
+                api('POST', '/api/links/reorder', { group_id: groupId, order: order })
+                    .catch(function (err) { console.error('Erreur reorder liens:', err); });
+            }
+            draggedLink = null;
+        }
     });
 
     /* ══════════════════════════════════════
@@ -429,6 +569,7 @@
 
         switch (action) {
             case 'new-group':
+                pendingPosition = null;
                 openGroupModal(null);
                 break;
             case 'edit-group':
@@ -440,6 +581,11 @@
                         .then(function () { location.href = '/?edit=1'; })
                         .catch(function (err) { alert(err.message); });
                 }
+                break;
+            case 'unplace-group':
+                api('POST', '/api/groups/' + id + '/move', { grid_row: -1, grid_col: 0 })
+                    .then(function () { location.href = '/?edit=1'; })
+                    .catch(function (err) { alert(err.message); });
                 break;
             case 'new-link':
                 openLinkModal(null, parseInt(btn.dataset.groupId));
@@ -455,6 +601,7 @@
                 }
                 break;
             case 'open-settings':
+                if (!settingsModal) initModals();
                 if (settingsModal) settingsModal.show();
                 break;
         }
@@ -464,6 +611,8 @@
        INITIALISATION
        ══════════════════════════════════════ */
 
+    buildOccupiedMap();
+    initModals();
     updateClock();
     updateGreeting();
     setInterval(updateClock, 1000);
@@ -472,7 +621,7 @@
     loadWeather();
     setInterval(loadWeather, 1800000);
 
-    // Entrer en mode édition si demandé par URL ou session
+    // Entrer en mode édition si demandé
     if (PAGE_DATA.editOnLoad) {
         setEditMode(true);
     } else {

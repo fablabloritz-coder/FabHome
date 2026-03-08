@@ -1,4 +1,4 @@
-"""FabHome — Page d'accueil personnalisée avec édition WYSIWYG."""
+"""FabHome — Page d'accueil personnalisée avec grille configurable."""
 
 import os
 import logging
@@ -48,7 +48,8 @@ def api_update_settings():
     data = request.get_json()
     if not data:
         return jsonify(error='Données manquantes'), 400
-    allowed = {'title', 'theme', 'background_url', 'greeting_name', 'search_provider'}
+    allowed = {'title', 'theme', 'background_url', 'greeting_name',
+               'search_provider', 'grid_cols', 'grid_rows'}
     for k, v in data.items():
         if k in allowed:
             models.update_setting(k, str(v)[:500])
@@ -66,7 +67,10 @@ def api_create_group():
     gid = models.create_group(
         name[:100],
         (data.get('icon') or 'bi-folder')[:50],
-        int(data.get('col_span', 1)))
+        int(data.get('col_span', 1)),
+        int(data.get('row_span', 1)),
+        int(data.get('grid_row', -1)),
+        int(data.get('grid_col', 0)))
     return jsonify(id=gid), 201
 
 
@@ -76,9 +80,13 @@ def api_update_group(gid):
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Nom requis'), 400
-    models.update_group(gid, name[:100],
-                        (data.get('icon') or 'bi-folder')[:50],
-                        int(data.get('col_span', 1)))
+    models.update_group(
+        gid, name[:100],
+        (data.get('icon') or 'bi-folder')[:50],
+        col_span=int(data['col_span']) if 'col_span' in data else None,
+        row_span=int(data['row_span']) if 'row_span' in data else None,
+        grid_row=int(data['grid_row']) if 'grid_row' in data else None,
+        grid_col=int(data['grid_col']) if 'grid_col' in data else None)
     return jsonify(ok=True)
 
 
@@ -88,13 +96,12 @@ def api_delete_group(gid):
     return jsonify(ok=True)
 
 
-@app.route('/api/groups/reorder', methods=['POST'])
-def api_reorder_groups():
+@app.route('/api/groups/<int:gid>/move', methods=['POST'])
+def api_move_group(gid):
     data = request.get_json() or {}
-    ids = data.get('order', [])
-    if not isinstance(ids, list):
-        return jsonify(error='Liste requise'), 400
-    models.reorder_groups([int(i) for i in ids])
+    if 'grid_row' not in data or 'grid_col' not in data:
+        return jsonify(error='grid_row et grid_col requis'), 400
+    models.move_group(gid, int(data['grid_row']), int(data['grid_col']))
     return jsonify(ok=True)
 
 
