@@ -20,7 +20,7 @@ Remplace avantageusement Homepage (gethomepage.dev) sans avoir à toucher du YAM
 ### Prérequis
 
 - Docker + Docker Compose installés
-- Port 3000 disponible (ou configurable via `FABHOME_PORT`)
+- Port 3001 disponible (ou configurable via `FABHOME_PORT`)
 
 ### Lancement
 
@@ -29,7 +29,7 @@ cd ~/fabhome          # ou le dossier de votre choix
 docker compose up -d --build
 ```
 
-L'application est accessible à `http://<IP-SERVEUR>:3000`.
+L'application est accessible à `http://<IP-SERVEUR>:3001`.
 
 ### Mise à jour
 
@@ -100,7 +100,7 @@ FabHome/
 ```bash
 docker compose ps              # Vérifier l'état du conteneur
 docker compose logs --tail=50  # Lire les logs
-curl http://localhost:3000/    # Tester localement
+curl http://localhost:3001/    # Tester localement
 ```
 
 ### Conflit de nom de conteneur
