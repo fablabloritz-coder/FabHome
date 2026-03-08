@@ -504,4 +504,6 @@ def err_413(e):
 
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
-    app.run(host='0.0.0.0', port=3000, debug=debug)
+    # Allow launching on a custom port outside Docker (default stays 3000).
+    port = int(os.environ.get('FABHOME_APP_PORT', os.environ.get('PORT', '3000')))
+    app.run(host='0.0.0.0', port=port, debug=debug)

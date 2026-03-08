@@ -56,7 +56,7 @@ docker compose up -d --build
 
 ## Utilisation
 
-1. Ouvrir `http://<IP-SERVEUR>:3000` dans le navigateur
+1. Ouvrir `http://<IP-SERVEUR>:3001` (Docker) ou `http://<IP-SERVEUR>:3000` (lancement Python direct) dans le navigateur
 2. Cliquer sur l'**engrenage** en bas à droite pour accéder à l'administration
 3. **Onglet Groupes & Liens** : créer des groupes, ajouter des liens, les réordonner
 4. **Onglet Widgets** : activer/désactiver horloge, recherche, météo, message d'accueil
