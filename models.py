@@ -32,6 +32,7 @@ def init_db():
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             name       TEXT    NOT NULL,
             icon       TEXT    NOT NULL DEFAULT 'bi-folder',
+            col_span   INTEGER NOT NULL DEFAULT 1,
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS links (
@@ -55,7 +56,11 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
     ''')
 
-    # Réglages par défaut
+    # Migration : col_span
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(groups_)").fetchall()]
+    if 'col_span' not in cols:
+        conn.execute('ALTER TABLE groups_ ADD COLUMN col_span INTEGER NOT NULL DEFAULT 1')
+
     for k, v in {
         'title': "Ma Page d'Accueil",
         'theme': 'dark',
@@ -65,7 +70,6 @@ def init_db():
     }.items():
         conn.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (k, v))
 
-    # Widgets par défaut
     for wtype, cfg, en, order in [
         ('greeting', '{}', 1, 0),
         ('search',   '{"provider":"google"}', 1, 1),
@@ -114,20 +118,25 @@ def get_groups():
     return groups
 
 
-def create_group(name, icon='bi-folder'):
+def create_group(name, icon='bi-folder', col_span=1):
     conn = get_db()
     mx = conn.execute('SELECT COALESCE(MAX(sort_order),0) FROM groups_').fetchone()[0]
-    cur = conn.execute('INSERT INTO groups_ (name, icon, sort_order) VALUES (?,?,?)',
-                       (name, icon, mx + 1))
+    cur = conn.execute(
+        'INSERT INTO groups_ (name, icon, col_span, sort_order) VALUES (?,?,?,?)',
+        (name, icon, max(1, min(3, col_span)), mx + 1))
     gid = cur.lastrowid
     conn.commit()
     conn.close()
     return gid
 
 
-def update_group(gid, name, icon):
+def update_group(gid, name, icon, col_span=None):
     conn = get_db()
-    conn.execute('UPDATE groups_ SET name=?, icon=? WHERE id=?', (name, icon, gid))
+    if col_span is not None:
+        conn.execute('UPDATE groups_ SET name=?, icon=?, col_span=? WHERE id=?',
+                     (name, icon, max(1, min(3, col_span)), gid))
+    else:
+        conn.execute('UPDATE groups_ SET name=?, icon=? WHERE id=?', (name, icon, gid))
     conn.commit()
     conn.close()
 
@@ -139,19 +148,11 @@ def delete_group(gid):
     conn.close()
 
 
-def move_group(gid, direction):
+def reorder_groups(ordered_ids):
     conn = get_db()
-    groups = conn.execute('SELECT id, sort_order FROM groups_ ORDER BY sort_order, id').fetchall()
-    ids = [g['id'] for g in groups]
-    if gid not in ids:
-        conn.close()
-        return
-    idx = ids.index(gid)
-    swap = idx + direction
-    if 0 <= swap < len(ids):
-        conn.execute('UPDATE groups_ SET sort_order=? WHERE id=?', (swap, gid))
-        conn.execute('UPDATE groups_ SET sort_order=? WHERE id=?', (idx, ids[swap]))
-        conn.commit()
+    for i, gid in enumerate(ordered_ids):
+        conn.execute('UPDATE groups_ SET sort_order=? WHERE id=?', (i, gid))
+    conn.commit()
     conn.close()
 
 
@@ -171,11 +172,16 @@ def create_link(group_id, name, url, icon='bi-link-45deg', description='', check
     return lid
 
 
-def update_link(lid, name, url, icon, description, check_status):
+def update_link(lid, name, url, icon, description, check_status, group_id=None):
     conn = get_db()
-    conn.execute(
-        'UPDATE links SET name=?,url=?,icon=?,description=?,check_status=? WHERE id=?',
-        (name, url, icon, description, check_status, lid))
+    if group_id is not None:
+        conn.execute(
+            'UPDATE links SET name=?,url=?,icon=?,description=?,check_status=?,group_id=? WHERE id=?',
+            (name, url, icon, description, check_status, group_id, lid))
+    else:
+        conn.execute(
+            'UPDATE links SET name=?,url=?,icon=?,description=?,check_status=? WHERE id=?',
+            (name, url, icon, description, check_status, lid))
     conn.commit()
     conn.close()
 
@@ -187,22 +193,12 @@ def delete_link(lid):
     conn.close()
 
 
-def move_link(lid, direction):
+def reorder_links(group_id, ordered_ids):
     conn = get_db()
-    link = conn.execute('SELECT group_id FROM links WHERE id=?', (lid,)).fetchone()
-    if not link:
-        conn.close()
-        return
-    links = conn.execute(
-        'SELECT id FROM links WHERE group_id=? ORDER BY sort_order, id',
-        (link['group_id'],)).fetchall()
-    ids = [l['id'] for l in links]
-    idx = ids.index(lid)
-    swap = idx + direction
-    if 0 <= swap < len(ids):
-        conn.execute('UPDATE links SET sort_order=? WHERE id=?', (swap, lid))
-        conn.execute('UPDATE links SET sort_order=? WHERE id=?', (idx, ids[swap]))
-        conn.commit()
+    for i, lid in enumerate(ordered_ids):
+        conn.execute('UPDATE links SET sort_order=?, group_id=? WHERE id=?',
+                     (i, group_id, lid))
+    conn.commit()
     conn.close()
 
 

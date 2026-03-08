@@ -1,18 +1,18 @@
-"""FabHome — Page d'accueil personnalisée avec administration web."""
+"""FabHome — Page d'accueil personnalisée avec édition WYSIWYG."""
 
 import os
 import logging
 import time
-import json as _json
+import json
 from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 
 import models
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 Mo
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s')
@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 models.init_db()
 
-# Cache mémoire simple (statuts + météo)
 _cache = {}
 
 
@@ -31,17 +30,15 @@ def index():
     settings = models.get_settings()
     groups = models.get_groups()
     widgets = {w['type']: w for w in models.get_widgets()}
-    return render_template('index.html', settings=settings,
-                           groups=groups, widgets=widgets)
+    return render_template('index.html',
+                           settings=settings, groups=groups, widgets=widgets,
+                           groups_json=json.dumps(groups),
+                           widgets_json=json.dumps(widgets))
 
 
 @app.route('/admin')
 def admin():
-    settings = models.get_settings()
-    groups = models.get_groups()
-    widgets = {w['type']: w for w in models.get_widgets()}
-    return render_template('admin.html', settings=settings,
-                           groups=groups, widgets=widgets)
+    return redirect(url_for('index', edit=1))
 
 
 # ── API : Réglages ────────────────────────────────────────
@@ -66,7 +63,10 @@ def api_create_group():
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Nom requis'), 400
-    gid = models.create_group(name[:100], (data.get('icon') or 'bi-folder')[:50])
+    gid = models.create_group(
+        name[:100],
+        (data.get('icon') or 'bi-folder')[:50],
+        int(data.get('col_span', 1)))
     return jsonify(id=gid), 201
 
 
@@ -76,7 +76,9 @@ def api_update_group(gid):
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Nom requis'), 400
-    models.update_group(gid, name[:100], (data.get('icon') or 'bi-folder')[:50])
+    models.update_group(gid, name[:100],
+                        (data.get('icon') or 'bi-folder')[:50],
+                        int(data.get('col_span', 1)))
     return jsonify(ok=True)
 
 
@@ -86,13 +88,13 @@ def api_delete_group(gid):
     return jsonify(ok=True)
 
 
-@app.route('/api/groups/<int:gid>/move', methods=['POST'])
-def api_move_group(gid):
+@app.route('/api/groups/reorder', methods=['POST'])
+def api_reorder_groups():
     data = request.get_json() or {}
-    d = data.get('direction', 0)
-    if d not in (-1, 1):
-        return jsonify(error='Direction invalide'), 400
-    models.move_group(gid, d)
+    ids = data.get('order', [])
+    if not isinstance(ids, list):
+        return jsonify(error='Liste requise'), 400
+    models.reorder_groups([int(i) for i in ids])
     return jsonify(ok=True)
 
 
@@ -120,7 +122,7 @@ def api_create_link():
     if not url:
         return jsonify(error='URL invalide (HTTP/HTTPS uniquement)'), 400
     lid = models.create_link(
-        group_id=group_id, name=name[:100], url=url,
+        group_id=int(group_id), name=name[:100], url=url,
         icon=(data.get('icon') or 'bi-link-45deg')[:50],
         description=(data.get('description') or '')[:200],
         check_status=1 if data.get('check_status') else 0)
@@ -140,7 +142,8 @@ def api_update_link(lid):
     models.update_link(lid, name[:100], url,
                        (data.get('icon') or 'bi-link-45deg')[:50],
                        (data.get('description') or '')[:200],
-                       1 if data.get('check_status') else 0)
+                       1 if data.get('check_status') else 0,
+                       group_id=data.get('group_id'))
     return jsonify(ok=True)
 
 
@@ -150,13 +153,14 @@ def api_delete_link(lid):
     return jsonify(ok=True)
 
 
-@app.route('/api/links/<int:lid>/move', methods=['POST'])
-def api_move_link(lid):
+@app.route('/api/links/reorder', methods=['POST'])
+def api_reorder_links():
     data = request.get_json() or {}
-    d = data.get('direction', 0)
-    if d not in (-1, 1):
-        return jsonify(error='Direction invalide'), 400
-    models.move_link(lid, d)
+    group_id = data.get('group_id')
+    ids = data.get('order', [])
+    if not group_id or not isinstance(ids, list):
+        return jsonify(error='group_id et order requis'), 400
+    models.reorder_links(int(group_id), [int(i) for i in ids])
     return jsonify(ok=True)
 
 
@@ -239,7 +243,7 @@ def api_weather():
         req = Request(api_url)
         req.add_header('User-Agent', 'FabHome/1.0')
         resp = urlopen(req, timeout=10)
-        data = _json.loads(resp.read().decode())
+        data = json.loads(resp.read().decode())
         result = {
             'temperature': data['current']['temperature_2m'],
             'weather_code': data['current']['weather_code'],
@@ -258,11 +262,7 @@ def api_weather():
 def err_404(e):
     if request.path.startswith('/api/'):
         return jsonify(error='Ressource non trouvée'), 404
-    settings = models.get_settings()
-    groups = models.get_groups()
-    widgets = {w['type']: w for w in models.get_widgets()}
-    return render_template('index.html', settings=settings,
-                           groups=groups, widgets=widgets), 404
+    return redirect(url_for('index'))
 
 
 @app.errorhandler(500)
