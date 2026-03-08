@@ -931,6 +931,7 @@ const PAGE_DATA = {
     grid_widgets: {{ grid_widgets_json | safe }},
     pages: {{ pages_json | safe }},
     services: {{ services_json | safe }},
+    profiles: {{ profiles_json | safe }},
     currentPage: {{ current_page }},
     editOnLoad: {{ 'true' if request.args.get('edit') else 'false' }}
 };

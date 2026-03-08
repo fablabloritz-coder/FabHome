@@ -60,7 +60,8 @@ def index():
     profile_id = get_current_profile_id()
     settings = models.get_settings(profile_id)
     pages = models.get_pages(profile_id)
-    page_id = request.args.get('page', 1, type=int)
+    default_page = pages[0]['id'] if pages else 1
+    page_id = request.args.get('page', default_page, type=int)
     groups = models.get_groups(page_id=page_id)
     widgets = {w['type']: w for w in models.get_widgets(profile_id)}
 
@@ -510,6 +511,7 @@ def api_service_proxy(sid):
         # ── PrêtGo : agrège inventaire + personnes
         if svc_type == 'pretgo':
             result = {'type': 'pretgo'}
+            errors = []
             try:
                 inv = _fetch_json(svc_url + '/api/inventaire')
                 items = inv if isinstance(inv, list) else inv.get('data', inv.get('items', []))
@@ -519,19 +521,25 @@ def api_service_proxy(sid):
                     e = it.get('etat', it.get('état', 'inconnu'))
                     etats[e] = etats.get(e, 0) + 1
                 result['etats'] = etats
-            except Exception:
+            except Exception as e:
                 result['total_materiel'] = None
+                errors.append(f'inventaire: {e}')
             try:
                 pers = _fetch_json(svc_url + '/api/personnes')
                 plist = pers if isinstance(pers, list) else pers.get('data', pers.get('items', []))
                 result['total_personnes'] = len(plist)
-            except Exception:
+            except Exception as e:
                 result['total_personnes'] = None
+                errors.append(f'personnes: {e}')
+            if result['total_materiel'] is None and result['total_personnes'] is None:
+                result['error'] = f'Impossible de joindre PrêtGo ({svc_url})'
+                logger.warning(f"PretGo proxy errors: {'; '.join(errors)}")
             return jsonify(result)
 
         # ── Fabtrack : résumé stats + machines
         if svc_type == 'fabtrack':
             result = {'type': 'fabtrack'}
+            errors = []
             try:
                 summary = _fetch_json(svc_url + '/api/stats/summary')
                 result['interventions_total'] = summary.get('interventions_total', 0)
@@ -540,16 +548,21 @@ def api_service_proxy(sid):
                 result['papier_feuilles'] = summary.get('papier_feuilles', 0)
                 by_type = summary.get('by_type', [])
                 result['by_type'] = by_type[:5] if isinstance(by_type, list) else []
-            except Exception:
+            except Exception as e:
                 result['interventions_total'] = None
+                errors.append(f'stats: {e}')
             try:
                 ref = _fetch_json(svc_url + '/api/reference')
                 machines = ref.get('machines', [])
                 result['machines_total'] = len(machines)
                 result['machines_actives'] = len([m for m in machines if m.get('actif')])
                 result['machines'] = [{'nom': m.get('nom', ''), 'statut': m.get('statut', '')} for m in machines[:8]]
-            except Exception:
+            except Exception as e:
                 result['machines_total'] = None
+                errors.append(f'reference: {e}')
+            if result['interventions_total'] is None and result.get('machines_total') is None:
+                result['error'] = f'Impossible de joindre Fabtrack ({svc_url})'
+                logger.warning(f"Fabtrack proxy errors: {'; '.join(errors)}")
             return jsonify(result)
 
         # ── Générique / autres types

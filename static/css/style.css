@@ -642,7 +642,7 @@ button.page-tab { border: 1px dashed var(--fh-card-border); }
 .grid-board {
     display: grid;
     grid-template-columns: repeat(var(--grid-cols, 4), 1fr);
-    grid-template-rows: repeat(var(--grid-rows, 3), minmax(120px, auto));
+    grid-auto-rows: 120px;
     gap: 1rem;
     flex: 1;
     min-width: 0;
@@ -659,7 +659,7 @@ button.page-tab { border: 1px dashed var(--fh-card-border); }
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     transition: transform 0.15s, box-shadow 0.15s;
-    overflow: hidden;
+    overflow: auto;
 }
 .group-card:hover {
     transform: translateY(-2px);
@@ -966,7 +966,7 @@ body.edit-mode .group-card {
     padding: 16px;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    overflow: hidden;
+    overflow: auto;
     transition: transform 0.18s, box-shadow 0.2s;
 }
 .grid-widget-card:hover {

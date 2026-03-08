@@ -799,6 +799,11 @@
 
     function renderServiceData(el, stype, data) {
         var html = '';
+        if (data.error) {
+            html = '<span class="text-warning" style="font-size:0.78rem"><i class="bi bi-exclamation-triangle"></i> ' + escHtml(data.error) + '</span>';
+            el.innerHTML = html;
+            return;
+        }
         if (stype === 'pretgo') {
             var mat = data.total_materiel;
             var pers = data.total_personnes;
@@ -816,6 +821,9 @@
             if (pers !== null && pers !== undefined) {
                 html += '<div class="svc-stat"><i class="bi bi-people"></i> <strong>' + pers + '</strong> personnes</div>';
             }
+            if (mat === null && pers === null) {
+                html += '<div class="svc-stat text-muted"><i class="bi bi-info-circle"></i> Aucune donnée disponible</div>';
+            }
             html += '</div>';
         } else if (stype === 'fabtrack') {
             html += '<div class="svc-app-block">';
@@ -831,6 +839,9 @@
                     html += '<span class="svc-machine ' + cls + '" title="' + escHtml(m.statut) + '">' + escHtml(m.nom) + '</span> ';
                 });
                 html += '</div>';
+            }
+            if (data.interventions_total === null && (!data.machines || !data.machines.length)) {
+                html += '<div class="svc-stat text-muted"><i class="bi bi-info-circle"></i> Aucune donnée disponible</div>';
             }
             html += '</div>';
         } else if (stype === 'pihole') {
@@ -1262,11 +1273,77 @@
                     });
             });
         }
+
+        // Manage profiles button
+        var manageBtn = qs('.profile-manage', profileDropdown);
+        if (manageBtn) {
+            manageBtn.addEventListener('click', function () {
+                profileDropdown.classList.add('hidden');
+                openProfileManager();
+            });
+        }
     }
 
-    /* ══════════════════════════════════════
-       WIDGET CAMÉRAS
-       ══════════════════════════════════════ */
+    function openProfileManager() {
+        var profiles = PAGE_DATA.profiles || [];
+        var html = '<div style="max-height:60vh;overflow:auto">';
+        profiles.forEach(function (p) {
+            var isDefault = p.id === 1;
+            html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1)">';
+            html += '<span style="font-size:1.3rem">' + escHtml(p.icon) + '</span>';
+            html += '<span style="flex:1;font-weight:600">' + escHtml(p.name) + '</span>';
+            if (!isDefault) {
+                html += '<button class="btn btn-sm btn-outline-light pm-rename" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" data-icon="' + escHtml(p.icon) + '"><i class="bi bi-pencil"></i></button>';
+                html += '<button class="btn btn-sm btn-outline-danger pm-delete" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '"><i class="bi bi-trash"></i></button>';
+            } else {
+                html += '<span class="badge bg-secondary">Principal</span>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+
+        var modalId = 'profileManagerModal';
+        var existing = qs('#' + modalId);
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.innerHTML = '<div class="modal fade" id="' + modalId + '" tabindex="-1">' +
+            '<div class="modal-dialog"><div class="modal-content">' +
+            '<div class="modal-header"><h5 class="modal-title">Gérer les profils</h5>' +
+            '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+            '<div class="modal-body">' + html + '</div>' +
+            '</div></div></div>';
+        document.body.appendChild(wrapper.firstChild);
+
+        var modalEl = qs('#' + modalId);
+        var bsModal = new bootstrap.Modal(modalEl);
+
+        qsa('.pm-rename', modalEl).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var pid = parseInt(this.dataset.id);
+                var newName = prompt('Nouveau nom:', this.dataset.name);
+                if (!newName) return;
+                var newIcon = prompt('Nouvelle icône (emoji):', this.dataset.icon);
+                if (!newIcon) return;
+                api('PUT', '/api/profiles/' + pid, { name: newName, icon: newIcon })
+                    .then(function () { window.location.reload(); })
+                    .catch(function (e) { alert('Erreur: ' + e.message); });
+            });
+        });
+
+        qsa('.pm-delete', modalEl).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var pid = parseInt(this.dataset.id);
+                var pname = this.dataset.name;
+                if (!confirm('Supprimer le profil "' + pname + '" et toutes ses données ?')) return;
+                api('DELETE', '/api/profiles/' + pid)
+                    .then(function () { window.location.reload(); })
+                    .catch(function (e) { alert('Erreur: ' + e.message); });
+            });
+        });
+
+        bsModal.show();
+    }
 
     function initCameras() {
         var cameraWidget = qs('.widget-camera');
