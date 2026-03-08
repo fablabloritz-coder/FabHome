@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="homepage"
-     {% if settings.background_url %}style="background-image: url({{ settings.background_url | tojson }});"{% endif %}>
+     {% if settings.background_url %}style="background-image: url('{{ settings.background_url }}');"{% endif %}>
 
     <!-- ═══ ZONE WIDGETS (haut) ═══ -->
     <div class="widgets-bar">
@@ -24,6 +24,26 @@
             <i class="bi bi-cloud"></i>
             <span id="weather-temp">--</span>°C
             <small id="weather-city">{{ widgets.weather.config.get('city', '') }}</small>
+        </div>
+        {% endif %}
+
+        {% if widgets.get('health') and widgets.health.enabled %}
+        <div class="widget-health" id="health-widget">
+            <div class="health-item" title="CPU">
+                <i class="bi bi-cpu"></i>
+                <div class="health-bar"><div class="health-fill" id="health-cpu"></div></div>
+                <small id="health-cpu-pct">--%</small>
+            </div>
+            <div class="health-item" title="RAM">
+                <i class="bi bi-memory"></i>
+                <div class="health-bar"><div class="health-fill" id="health-ram"></div></div>
+                <small id="health-ram-pct">--%</small>
+            </div>
+            <div class="health-item" title="Disque">
+                <i class="bi bi-device-hdd"></i>
+                <div class="health-bar"><div class="health-fill" id="health-disk"></div></div>
+                <small id="health-disk-pct">--%</small>
+            </div>
         </div>
         {% endif %}
     </div>
@@ -207,8 +227,15 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Icône</label>
-                        <input type="text" class="form-control" name="icon" value="bi-folder">
-                        <div class="form-text">Bootstrap Icon, émoji ou URL d'image</div>
+                        <div class="input-group mb-1">
+                            <input type="text" class="form-control" name="icon" value="bi-folder">
+                            <label class="btn btn-outline-secondary" title="Upload icône">
+                                <i class="bi bi-upload"></i>
+                                <input type="file" accept="image/*" class="icon-upload-input d-none"
+                                       data-target="groupForm">
+                            </label>
+                        </div>
+                        <div class="form-text">Bootstrap Icon, émoji, URL d'image ou upload</div>
                         <div class="icon-grid mt-2">
                             <span class="ig" data-v="bi-folder"><i class="bi bi-folder"></i></span>
                             <span class="ig" data-v="bi-server"><i class="bi bi-server"></i></span>
@@ -282,7 +309,18 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Icône</label>
-                        <input type="text" class="form-control" name="icon" value="bi-link-45deg">
+                        <div class="input-group mb-1">
+                            <input type="text" class="form-control" name="icon" value="bi-link-45deg">
+                            <button type="button" class="btn btn-outline-secondary" id="fetchFavicon"
+                                    title="Récupérer l'icône du site">
+                                <i class="bi bi-globe2"></i>
+                            </button>
+                            <label class="btn btn-outline-secondary" title="Upload icône">
+                                <i class="bi bi-upload"></i>
+                                <input type="file" accept="image/*" class="icon-upload-input d-none"
+                                       data-target="linkForm">
+                            </label>
+                        </div>
                         <div class="icon-grid mt-2">
                             <span class="ig" data-v="bi-link-45deg"><i class="bi bi-link-45deg"></i></span>
                             <span class="ig" data-v="bi-globe"><i class="bi bi-globe"></i></span>
@@ -354,13 +392,25 @@
                                 <select class="form-select" name="theme">
                                     <option value="dark" {% if settings.get('theme')=='dark' %}selected{% endif %}>🌙 Sombre</option>
                                     <option value="light" {% if settings.get('theme')=='light' %}selected{% endif %}>☀️ Clair</option>
+                                    <option value="nord" {% if settings.get('theme')=='nord' %}selected{% endif %}>🧊 Nord</option>
+                                    <option value="dracula" {% if settings.get('theme')=='dracula' %}selected{% endif %}>🧛 Dracula</option>
+                                    <option value="ocean" {% if settings.get('theme')=='ocean' %}selected{% endif %}>🌊 Océan</option>
+                                    <option value="forest" {% if settings.get('theme')=='forest' %}selected{% endif %}>🌲 Forêt</option>
+                                    <option value="sunset" {% if settings.get('theme')=='sunset' %}selected{% endif %}>🌅 Coucher de soleil</option>
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Image de fond (URL)</label>
-                                <input type="url" class="form-control" name="background_url"
-                                       value="{{ settings.get('background_url', '') }}"
-                                       placeholder="https://exemple.com/fond.jpg">
+                                <label class="form-label">Image de fond</label>
+                                <div class="input-group mb-1">
+                                    <input type="url" class="form-control" name="background_url"
+                                           value="{{ settings.get('background_url', '') }}"
+                                           placeholder="https://exemple.com/fond.jpg">
+                                    <label class="btn btn-outline-secondary" title="Upload image">
+                                        <i class="bi bi-upload"></i>
+                                        <input type="file" accept="image/*" id="bgUploadInput" class="d-none">
+                                    </label>
+                                </div>
+                                <div class="form-text">URL ou upload (max 2 Mo)</div>
                             </div>
                         </div>
                         <div class="tab-pane fade" id="stWidgets">
@@ -427,6 +477,17 @@
                                                value="{{ wwc.get('longitude', 6.18) }}" step="0.01" placeholder="Longitude">
                                     </div>
                                 </div>
+                            </div>
+                            {% set wh = widgets.get('health', {}) %}
+                            <div class="settings-widget-row">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <strong><i class="bi bi-speedometer2"></i> Santé serveur</strong>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="health_enabled"
+                                               {% if wh and wh.enabled %}checked{% endif %}>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">CPU, RAM et disque du serveur</small>
                             </div>
                         </div>
                     </div>

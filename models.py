@@ -96,6 +96,7 @@ def init_db():
         ('search',   '{"provider":"google"}', 1, 1),
         ('clock',    '{}', 1, 2),
         ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 3),
+        ('health',   '{}', 0, 4),
     ]:
         conn.execute(
             'INSERT OR IGNORE INTO widgets (type, config, enabled, sort_order) VALUES (?,?,?,?)',

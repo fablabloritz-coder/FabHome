@@ -199,6 +199,24 @@
         }).catch(function () {});
     }
 
+    function loadHealth() {
+        var w = qs('#health-widget');
+        if (!w) return;
+        fetch('/api/health').then(function (r) { return r.json(); }).then(function (d) {
+            if (d.error) return;
+            var metrics = ['cpu', 'ram', 'disk'];
+            metrics.forEach(function (m) {
+                var fill = qs('#health-' + m);
+                var pct = qs('#health-' + m + '-pct');
+                if (fill) {
+                    fill.style.width = d[m] + '%';
+                    fill.className = 'health-fill' + (d[m] > 85 ? ' critical' : d[m] > 60 ? ' warning' : '');
+                }
+                if (pct) pct.textContent = Math.round(d[m]) + '%';
+            });
+        }).catch(function () {});
+    }
+
     /* ══════════════════════════════════════
        MODE ÉDITION
        ══════════════════════════════════════ */
@@ -213,9 +231,11 @@
         if (editBtn) editBtn.classList.toggle('active', on);
         if (editIcon) editIcon.className = on ? 'bi bi-check-lg' : 'bi bi-pencil';
 
-        // Rendre les groupes glissables
-        qsa('.group-card').forEach(function (c) { c.draggable = on; });
+        // Rendre les groupes glissables uniquement via le drag-handle
+        qsa('.group-card').forEach(function (c) { c.draggable = false; });
         qsa('.palette-block').forEach(function (b) { b.draggable = on; });
+        // Rendre les liens glissables (réordonnement)
+        qsa('.link-wrap').forEach(function (w) { w.draggable = on; });
 
         renderEmptyCells();
         updateUnplacedSection();
@@ -226,6 +246,19 @@
     if (editBtn) {
         editBtn.addEventListener('click', function () { setEditMode(!editMode); });
     }
+
+    // Drag-handle: rendre le group-card draggable temporairement
+    document.addEventListener('mousedown', function (e) {
+        if (!editMode) return;
+        var handle = e.target.closest('.drag-handle');
+        if (!handle) return;
+        var card = handle.closest('.group-card');
+        if (card) card.draggable = true;
+    });
+    document.addEventListener('mouseup', function () {
+        // Reset après drop/cancel
+        qsa('.group-card').forEach(function (c) { c.draggable = false; });
+    });
 
     /* ══════════════════════════════════════
        MODALES
@@ -374,7 +407,8 @@
                         latitude: parseFloat(f.elements.weather_lat.value) || 48.69,
                         longitude: parseFloat(f.elements.weather_lon.value) || 6.18
                     }
-                }
+                },
+                health: { enabled: f.elements.health_enabled.checked, config: {} }
             };
             Promise.all([
                 api('PUT', '/api/settings', settingsBody),
@@ -394,6 +428,65 @@
             if (input) input.value = ig.dataset.v;
         }
     });
+
+    /* ── Upload icône ─────────────────── */
+    document.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('icon-upload-input')) return;
+        var file = e.target.files[0];
+        if (!file) return;
+        var formData = new FormData();
+        formData.append('file', file);
+        fetch('/api/upload/icon', { method: 'POST', body: formData })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.error) { alert(d.error); return; }
+                var targetForm = e.target.dataset.target;
+                var form = qs('#' + targetForm);
+                if (form) form.elements.icon.value = d.url;
+            })
+            .catch(function (err) { alert('Erreur upload : ' + err.message); });
+        e.target.value = '';
+    });
+
+    /* ── Fetch favicon ────────────────── */
+    var fetchFavBtn = qs('#fetchFavicon');
+    if (fetchFavBtn) {
+        fetchFavBtn.addEventListener('click', function () {
+            var urlInput = qs('#linkForm input[name="url"]');
+            var iconInput = qs('#linkForm input[name="icon"]');
+            if (!urlInput || !iconInput || !urlInput.value.trim()) {
+                alert('Renseignez d\'abord l\'URL du lien');
+                return;
+            }
+            fetch('/api/favicon?url=' + encodeURIComponent(urlInput.value.trim()))
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.error) { alert(d.error); return; }
+                    iconInput.value = d.icon;
+                })
+                .catch(function (err) { alert('Erreur : ' + err.message); });
+        });
+    }
+
+    /* ── Upload fond d'écran ──────────── */
+    var bgUpload = qs('#bgUploadInput');
+    if (bgUpload) {
+        bgUpload.addEventListener('change', function () {
+            var file = bgUpload.files[0];
+            if (!file) return;
+            var formData = new FormData();
+            formData.append('file', file);
+            fetch('/api/upload/background', { method: 'POST', body: formData })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.error) { alert(d.error); return; }
+                    var urlInput = qs('#settingsForm input[name="background_url"]');
+                    if (urlInput) urlInput.value = d.url;
+                })
+                .catch(function (err) { alert('Erreur upload : ' + err.message); });
+            bgUpload.value = '';
+        });
+    }
 
     /* ══════════════════════════════════════
        TAILLE DE LA GRILLE (palette)
@@ -620,6 +713,8 @@
     setInterval(checkStatuses, 60000);
     loadWeather();
     setInterval(loadWeather, 1800000);
+    loadHealth();
+    setInterval(loadHealth, 30000);
 
     // Entrer en mode édition si demandé
     if (PAGE_DATA.editOnLoad) {

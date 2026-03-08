@@ -4,15 +4,26 @@ import os
 import logging
 import time
 import json
+import ssl
+import uuid
+import glob
 from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory
 
 import models
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
+UPLOAD_DIR = os.path.join(os.environ.get('FABHOME_DATA', 'data'), 'uploads')
+ICON_DIR = os.path.join(UPLOAD_DIR, 'icons')
+BG_DIR = os.path.join(UPLOAD_DIR, 'bg')
+ALLOWED_IMG = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico'}
+
+os.makedirs(ICON_DIR, exist_ok=True)
+os.makedirs(BG_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s')
@@ -178,7 +189,7 @@ def api_update_widgets():
     data = request.get_json()
     if not data:
         return jsonify(error='Données manquantes'), 400
-    allowed = {'greeting', 'search', 'clock', 'weather'}
+    allowed = {'greeting', 'search', 'clock', 'weather', 'health'}
     for wtype, wdata in data.items():
         if wtype in allowed and isinstance(wdata, dict):
             models.update_widget(wtype,
@@ -188,6 +199,79 @@ def api_update_widgets():
 
 
 # ── API : Statuts ─────────────────────────────────────────
+
+# Servir les fichiers uploadés
+@app.route('/uploads/<path:filepath>')
+def serve_upload(filepath):
+    return send_from_directory(UPLOAD_DIR, filepath)
+
+
+# Upload d'icône
+@app.route('/api/upload/icon', methods=['POST'])
+def api_upload_icon():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify(error='Fichier manquant'), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ALLOWED_IMG:
+        return jsonify(error='Format non supporté'), 400
+    name = uuid.uuid4().hex[:12] + ext
+    f.save(os.path.join(ICON_DIR, name))
+    return jsonify(url='/uploads/icons/' + name), 201
+
+
+# Upload de fond d'écran (remplace l'ancien)
+@app.route('/api/upload/background', methods=['POST'])
+def api_upload_background():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify(error='Fichier manquant'), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ALLOWED_IMG:
+        return jsonify(error='Format non supporté'), 400
+    # Supprimer l'ancien fond
+    for old in glob.glob(os.path.join(BG_DIR, '*')):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+    name = 'background' + ext
+    f.save(os.path.join(BG_DIR, name))
+    bg_url = '/uploads/bg/' + name
+    models.update_setting('background_url', bg_url)
+    return jsonify(url=bg_url), 201
+
+
+# Proxy favicon
+@app.route('/api/favicon')
+def api_favicon():
+    url = request.args.get('url', '').strip()
+    if not url:
+        return jsonify(error='URL manquante'), 400
+    try:
+        parsed = urlparse(url if '://' in url else 'https://' + url)
+        domain = parsed.hostname
+        if not domain:
+            return jsonify(error='Domaine invalide'), 400
+        # Google favicon service
+        return jsonify(icon='https://www.google.com/s2/favicons?domain=' +
+                       domain + '&sz=64')
+    except Exception:
+        return jsonify(error='Erreur'), 400
+
+
+# Santé serveur
+@app.route('/api/health')
+def api_health():
+    try:
+        import psutil
+        return jsonify(
+            cpu=psutil.cpu_percent(interval=0.5),
+            ram=psutil.virtual_memory().percent,
+            disk=psutil.disk_usage('/').percent
+        )
+    except ImportError:
+        return jsonify(error='psutil non installé'), 501
 
 @app.route('/api/status')
 def api_status():
@@ -209,19 +293,22 @@ def api_status():
 
 
 def _ping(url):
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
     try:
         parsed = urlparse(url)
         if parsed.scheme not in ('http', 'https'):
             return 'down'
         req = Request(url, method='HEAD')
         req.add_header('User-Agent', 'FabHome/1.0')
-        urlopen(req, timeout=5)
+        urlopen(req, timeout=5, context=ctx)
         return 'up'
     except Exception:
         try:
             req = Request(url)
             req.add_header('User-Agent', 'FabHome/1.0')
-            urlopen(req, timeout=5)
+            urlopen(req, timeout=5, context=ctx)
             return 'up'
         except Exception:
             return 'down'

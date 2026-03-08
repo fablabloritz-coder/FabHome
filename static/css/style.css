@@ -28,6 +28,81 @@
     --fh-edit-handle: rgba(0,0,0,0.08);
 }
 
+/* ── Thème Nord ───────────────────────── */
+[data-fh-theme="nord"] {
+    --fh-bg: #2e3440;
+    --fh-bg-gradient: linear-gradient(135deg, #2e3440 0%, #3b4252 100%);
+    --fh-card-bg: rgba(59,66,82,0.8);
+    --fh-card-border: rgba(76,86,106,0.5);
+    --fh-text: #eceff4;
+    --fh-text-muted: #a3b1c7;
+    --fh-search-bg: rgba(59,66,82,0.9);
+    --fh-edit-outline: rgba(136,192,208,0.4);
+    --fh-edit-handle: rgba(136,192,208,0.15);
+    --fh-accent: #88c0d0;
+    --fh-accent-glow: rgba(136,192,208,0.35);
+}
+
+/* ── Thème Dracula ────────────────────── */
+[data-fh-theme="dracula"] {
+    --fh-bg: #282a36;
+    --fh-bg-gradient: linear-gradient(135deg, #282a36 0%, #1e1f29 100%);
+    --fh-card-bg: rgba(68,71,90,0.6);
+    --fh-card-border: rgba(98,114,164,0.4);
+    --fh-text: #f8f8f2;
+    --fh-text-muted: #b0b8d1;
+    --fh-search-bg: rgba(68,71,90,0.8);
+    --fh-edit-outline: rgba(189,147,249,0.4);
+    --fh-edit-handle: rgba(189,147,249,0.15);
+    --fh-accent: #bd93f9;
+    --fh-accent-glow: rgba(189,147,249,0.35);
+}
+
+/* ── Thème Océan ──────────────────────── */
+[data-fh-theme="ocean"] {
+    --fh-bg: #0a1628;
+    --fh-bg-gradient: linear-gradient(135deg, #0a1628 0%, #102040 100%);
+    --fh-card-bg: rgba(16,40,80,0.6);
+    --fh-card-border: rgba(30,80,160,0.3);
+    --fh-text: #d0e0f0;
+    --fh-text-muted: #7099c0;
+    --fh-search-bg: rgba(16,40,80,0.8);
+    --fh-edit-outline: rgba(0,180,216,0.4);
+    --fh-edit-handle: rgba(0,180,216,0.15);
+    --fh-accent: #00b4d8;
+    --fh-accent-glow: rgba(0,180,216,0.35);
+}
+
+/* ── Thème Forêt ──────────────────────── */
+[data-fh-theme="forest"] {
+    --fh-bg: #1a2a1a;
+    --fh-bg-gradient: linear-gradient(135deg, #1a2a1a 0%, #253525 100%);
+    --fh-card-bg: rgba(34,60,34,0.6);
+    --fh-card-border: rgba(60,100,60,0.3);
+    --fh-text: #d0e8d0;
+    --fh-text-muted: #80a880;
+    --fh-search-bg: rgba(34,60,34,0.8);
+    --fh-edit-outline: rgba(76,175,80,0.4);
+    --fh-edit-handle: rgba(76,175,80,0.15);
+    --fh-accent: #4caf50;
+    --fh-accent-glow: rgba(76,175,80,0.35);
+}
+
+/* ── Thème Coucher de soleil ──────────── */
+[data-fh-theme="sunset"] {
+    --fh-bg: #1f1020;
+    --fh-bg-gradient: linear-gradient(135deg, #1f1020 0%, #2d1530 100%);
+    --fh-card-bg: rgba(60,25,60,0.5);
+    --fh-card-border: rgba(120,50,100,0.3);
+    --fh-text: #f0d0e0;
+    --fh-text-muted: #b080a0;
+    --fh-search-bg: rgba(60,25,60,0.7);
+    --fh-edit-outline: rgba(255,127,80,0.4);
+    --fh-edit-handle: rgba(255,127,80,0.15);
+    --fh-accent: #ff7f50;
+    --fh-accent-glow: rgba(255,127,80,0.35);
+}
+
 /* ── Base ─────────────────────────────── */
 * { box-sizing: border-box; }
 body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
@@ -65,6 +140,33 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     border-radius: 20px; border: 1px solid var(--fh-card-border);
 }
 .widget-weather i { font-size: 1.3rem; }
+
+/* ══════════════════════════════════════════
+   WIDGET SANTÉ SERVEUR
+   ══════════════════════════════════════════ */
+.widget-health {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--fh-card-bg); padding: 0.5rem 1rem;
+    border-radius: 20px; border: 1px solid var(--fh-card-border);
+}
+.health-item {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.85rem; color: var(--fh-text-muted);
+}
+.health-item i { font-size: 1rem; }
+.health-bar {
+    width: 60px; height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px; overflow: hidden;
+}
+[data-bs-theme="light"] .health-bar { background: rgba(0,0,0,0.08); }
+.health-fill {
+    height: 100%; border-radius: 3px;
+    background: #06d6a0; transition: width 0.5s;
+    width: 0;
+}
+.health-fill.warning { background: #ffc107; }
+.health-fill.critical { background: #ef476f; }
 
 /* ══════════════════════════════════════════
    BARRE DE RECHERCHE

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ settings.get('theme', 'dark') }}">
+<html lang="fr" data-bs-theme="{{ 'light' if settings.get('theme') == 'light' else 'dark' }}"
+      data-fh-theme="{{ settings.get('theme', 'dark') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
