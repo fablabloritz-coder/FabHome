@@ -60,6 +60,23 @@
     </div>
     {% endif %}
 
+    <!-- ═══ ONGLETS PAGES ═══ -->
+    {% if pages|length > 1 or (request.args.get('edit')) %}
+    <div class="page-tabs" id="pageTabs">
+        {% for page in pages %}
+        <a href="/?page={{ page.id }}{% if request.args.get('edit') %}&edit=1{% endif %}"
+           class="page-tab{% if page.id == current_page %} active{% endif %}"
+           data-page-id="{{ page.id }}">
+            <i class="bi {{ page.icon }}"></i>
+            <span>{{ page.name }}</span>
+        </a>
+        {% endfor %}
+        <button class="page-tab page-tab-add edit-only" data-action="new-page" title="Nouvelle page">
+            <i class="bi bi-plus-lg"></i>
+        </button>
+    </div>
+    {% endif %}
+
     <!-- ═══ CONTENEUR (grille + palette) ═══ -->
     <div class="main-container">
 
@@ -84,7 +101,7 @@
                 </div>
 
                 <div class="group-header">
-                    {% if group.icon.startswith('http') %}
+                    {% if group.icon.startswith('http') or group.icon.startswith('/') %}
                     <img src="{{ group.icon }}" class="group-icon-img" alt="">
                     {% elif group.icon|length <= 2 %}
                     <span class="group-icon-emoji">{{ group.icon }}</span>
@@ -99,7 +116,7 @@
                     <div class="link-wrap" data-link-id="{{ link.id }}" draggable="false">
                         <a href="{{ link.url }}" class="link-item" target="_blank" rel="noopener noreferrer">
                             <div class="link-icon">
-                                {% if link.icon.startswith('http') %}
+                                {% if link.icon.startswith('http') or link.icon.startswith('/') %}
                                 <img src="{{ link.icon }}" alt="">
                                 {% elif link.icon|length <= 2 %}
                                 <span>{{ link.icon }}</span>
@@ -148,7 +165,7 @@
                 <div class="palette-label">Taille de la grille</div>
                 <div class="grid-size-ctrl">
                     <label>Col</label>
-                    <input type="number" id="gridColsInput" min="2" max="8"
+                    <input type="number" id="gridColsInput" min="2" max="16"
                            value="{{ settings.get('grid_cols', '4') }}" class="form-control form-control-sm">
                 </div>
                 <div class="grid-size-ctrl">
@@ -172,7 +189,7 @@
                 <div id="unplacedList">
                     {% for group in groups if group.grid_row < 0 %}
                     <div class="palette-block" draggable="true" data-group-id="{{ group.id }}">
-                        {% if group.icon.startswith('http') %}
+                        {% if group.icon.startswith('http') or group.icon.startswith('/') %}
                         <img src="{{ group.icon }}" class="palette-block-icon" alt="">
                         {% elif group.icon|length <= 2 %}
                         <span>{{ group.icon }}</span>
@@ -189,6 +206,9 @@
                 <button class="btn-palette btn-palette-muted" data-action="open-settings">
                     <i class="bi bi-gear"></i> Réglages
                 </button>
+                <button class="btn-palette btn-palette-muted mt-1" data-action="edit-current-page" title="Modifier cette page">
+                    <i class="bi bi-pencil-square"></i> Page courante
+                </button>
             </div>
         </aside>
 
@@ -198,6 +218,22 @@
     <div class="empty-state" id="emptyState">
         <i class="bi bi-house-add"></i>
         <p>Bienvenue ! Cliquez sur le <strong>crayon</strong> en bas à droite<br>pour personnaliser votre page.</p>
+    </div>
+    {% endif %}
+
+    <!-- ═══ SERVICES (widgets API intégrés) ═══ -->
+    {% if services %}
+    <div class="services-bar" id="servicesBar">
+        {% for svc in services if svc.enabled %}
+        <div class="service-widget" data-service-id="{{ svc.id }}" data-service-type="{{ svc.type }}">
+            <div class="service-header">
+                <i class="bi bi-{{ svc.type if svc.type != 'generic' else 'plug' }}"></i>
+                <span>{{ svc.name }}</span>
+                <span class="service-status" id="svc-status-{{ svc.id }}">…</span>
+            </div>
+            <div class="service-data" id="svc-data-{{ svc.id }}"></div>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
 
@@ -266,6 +302,7 @@
                                 <option value="1">1 col</option>
                                 <option value="2">2 col</option>
                                 <option value="3">3 col</option>
+                                <option value="4">4 col</option>
                             </select>
                         </div>
                         <div class="col-6">
@@ -274,6 +311,7 @@
                                 <option value="1">1 lig</option>
                                 <option value="2">2 lig</option>
                                 <option value="3">3 lig</option>
+                                <option value="4">4 lig</option>
                             </select>
                         </div>
                     </div>
@@ -379,6 +417,12 @@
                         <li class="nav-item">
                             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stWidgets" type="button">Widgets</button>
                         </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stServices" type="button">Services</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stData" type="button">Données</button>
+                        </li>
                     </ul>
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="stAppearance">
@@ -402,7 +446,7 @@
                             <div class="mb-3">
                                 <label class="form-label">Image de fond</label>
                                 <div class="input-group mb-1">
-                                    <input type="url" class="form-control" name="background_url"
+                                    <input type="text" class="form-control" name="background_url"
                                            value="{{ settings.get('background_url', '') }}"
                                            placeholder="https://exemple.com/fond.jpg">
                                     <label class="btn btn-outline-secondary" title="Upload image">
@@ -490,6 +534,47 @@
                                 <small class="form-text text-muted">CPU, RAM et disque du serveur</small>
                             </div>
                         </div>
+                        <div class="tab-pane fade" id="stServices">
+                            <p class="text-muted mb-3">Intégrations API — ajoutez des services pour afficher leurs informations sur la page d'accueil.</p>
+                            <div id="servicesList">
+                                {% for svc in services %}
+                                <div class="settings-widget-row" data-service-id="{{ svc.id }}">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <strong>{{ svc.name }}</strong>
+                                        <div class="d-flex gap-1">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-action="edit-service" data-id="{{ svc.id }}">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete-service" data-id="{{ svc.id }}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">{{ svc.type }} — {{ svc.url }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-outline-primary w-100 mt-2" data-action="new-service">
+                                <i class="bi bi-plus-lg"></i> Ajouter un service
+                            </button>
+                        </div>
+                        <div class="tab-pane fade" id="stData">
+                            <div class="settings-widget-row">
+                                <strong><i class="bi bi-download"></i> Exporter la configuration</strong>
+                                <p class="text-muted small mb-2">Télécharger toutes les données (groupes, liens, réglages, pages, services) en JSON.</p>
+                                <button type="button" class="btn btn-outline-primary w-100" id="exportConfigBtn">
+                                    <i class="bi bi-file-earmark-arrow-down"></i> Exporter
+                                </button>
+                            </div>
+                            <div class="settings-widget-row">
+                                <strong><i class="bi bi-upload"></i> Importer une configuration</strong>
+                                <p class="text-muted small mb-2">Restaurer depuis un fichier JSON. <strong class="text-danger">Cela remplacera toutes les données actuelles.</strong></p>
+                                <label class="btn btn-outline-warning w-100">
+                                    <i class="bi bi-file-earmark-arrow-up"></i> Importer
+                                    <input type="file" accept=".json" id="importConfigInput" class="d-none">
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -502,12 +587,102 @@
 </div>
 {% endblock %}
 
+<!-- MODAL SERVICE -->
+<div class="modal fade" id="serviceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="serviceForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="serviceModalTitle">Ajouter un service</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom</label>
+                        <input type="text" class="form-control" name="name" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" name="type">
+                            <option value="generic">Générique (JSON)</option>
+                            <option value="docker">Docker</option>
+                            <option value="portainer">Portainer</option>
+                            <option value="proxmox">Proxmox</option>
+                            <option value="pihole">Pi-hole</option>
+                            <option value="adguard">AdGuard Home</option>
+                            <option value="plex">Plex</option>
+                            <option value="radarr">Radarr</option>
+                            <option value="sonarr">Sonarr</option>
+                            <option value="truenas">TrueNAS</option>
+                            <option value="uptimekuma">Uptime Kuma</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL</label>
+                        <input type="text" class="form-control" name="url" required maxlength="2000"
+                               placeholder="http://192.168.1.x:port">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Clé API <small class="text-muted">(optionnel)</small></label>
+                        <input type="text" class="form-control" name="api_key" maxlength="500">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PAGE -->
+<div class="modal fade" id="pageModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <form id="pageForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pageModalTitle">Nouvelle page</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom</label>
+                        <input type="text" class="form-control" name="name" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Icône</label>
+                        <input type="text" class="form-control" name="icon" value="bi-file-earmark">
+                        <div class="icon-grid mt-2">
+                            <span class="ig" data-v="bi-house"><i class="bi bi-house"></i></span>
+                            <span class="ig" data-v="bi-file-earmark"><i class="bi bi-file-earmark"></i></span>
+                            <span class="ig" data-v="bi-server"><i class="bi bi-server"></i></span>
+                            <span class="ig" data-v="bi-camera-video"><i class="bi bi-camera-video"></i></span>
+                            <span class="ig" data-v="bi-tools"><i class="bi bi-tools"></i></span>
+                            <span class="ig" data-v="bi-controller"><i class="bi bi-controller"></i></span>
+                            <span class="ig" data-v="bi-book"><i class="bi bi-book"></i></span>
+                            <span class="ig" data-v="bi-star"><i class="bi bi-star"></i></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}
 <script>
 const PAGE_DATA = {
     settings: {{ settings | tojson }},
     groups: {{ groups_json | safe }},
     widgets: {{ widgets_json | safe }},
+    pages: {{ pages_json | safe }},
+    services: {{ services_json | safe }},
+    currentPage: {{ current_page }},
     editOnLoad: {{ 'true' if request.args.get('edit') else 'false' }}
 };
 </script>

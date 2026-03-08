@@ -1,4 +1,4 @@
-/* FabHome — Logique : grille configurable, DnD avec snap, CRUD, widgets */
+/* FabHome — Logique : grille configurable, DnD avec snap, CRUD, widgets, pages, services */
 
 (function () {
     'use strict';
@@ -33,15 +33,20 @@
         return null;
     }
 
+    function editUrl() {
+        var pg = PAGE_DATA.currentPage;
+        return pg && pg !== 1 ? '/?page=' + pg + '&edit=1' : '/?edit=1';
+    }
+
     /* ══════════════════════════════════════
-       ÉTAT DE LA GRILLE
+       ETAT DE LA GRILLE
        ══════════════════════════════════════ */
 
     var gridBoard = qs('#gridBoard');
     var highlight = qs('#gridHighlight');
     var gridCols = parseInt(PAGE_DATA.settings.grid_cols) || 4;
     var gridRows = parseInt(PAGE_DATA.settings.grid_rows) || 3;
-    var occupiedMap = {}; // "row,col" → groupId
+    var occupiedMap = {};
 
     function buildOccupiedMap() {
         occupiedMap = {};
@@ -81,7 +86,7 @@
     }
 
     /* ══════════════════════════════════════
-       CELLULES VIDES (mode édition)
+       CELLULES VIDES (mode edition)
        ══════════════════════════════════════ */
 
     var pendingPosition = null;
@@ -124,7 +129,7 @@
     }
 
     /* ══════════════════════════════════════
-       WIDGETS (horloge, accueil, météo, recherche)
+       WIDGETS (horloge, accueil, meteo, recherche)
        ══════════════════════════════════════ */
 
     function updateClock() {
@@ -141,7 +146,7 @@
         var el = qs('#greeting-text');
         if (!el) return;
         var h = new Date().getHours();
-        var g = h >= 5 && h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir';
+        var g = h >= 5 && h < 12 ? 'Bonjour' : h < 18 ? "Bon apr\u00e8s-midi" : 'Bonsoir';
         var name = PAGE_DATA.settings.greeting_name;
         el.textContent = g + (name ? ', ' + name : '') + ' \uD83D\uDC4B';
     }
@@ -218,7 +223,7 @@
     }
 
     /* ══════════════════════════════════════
-       MODE ÉDITION
+       MODE EDITION
        ══════════════════════════════════════ */
 
     var editMode = false;
@@ -231,23 +236,26 @@
         if (editBtn) editBtn.classList.toggle('active', on);
         if (editIcon) editIcon.className = on ? 'bi bi-check-lg' : 'bi bi-pencil';
 
-        // Rendre les groupes glissables uniquement via le drag-handle
         qsa('.group-card').forEach(function (c) { c.draggable = false; });
         qsa('.palette-block').forEach(function (b) { b.draggable = on; });
-        // Rendre les liens glissables (réordonnement)
         qsa('.link-wrap').forEach(function (w) { w.draggable = on; });
 
         renderEmptyCells();
         updateUnplacedSection();
 
         try { sessionStorage.setItem('fh_edit', on ? '1' : '0'); } catch (e) {}
+        var pageParam = PAGE_DATA.currentPage && PAGE_DATA.currentPage !== 1 ? 'page=' + PAGE_DATA.currentPage : '';
+        if (on) {
+            history.replaceState(null, '', pageParam ? '/?' + pageParam + '&edit=1' : '/?edit=1');
+        } else {
+            history.replaceState(null, '', pageParam ? '/?' + pageParam : '/');
+        }
     }
 
     if (editBtn) {
         editBtn.addEventListener('click', function () { setEditMode(!editMode); });
     }
 
-    // Drag-handle: rendre le group-card draggable temporairement
     document.addEventListener('mousedown', function (e) {
         if (!editMode) return;
         var handle = e.target.closest('.drag-handle');
@@ -256,7 +264,6 @@
         if (card) card.draggable = true;
     });
     document.addEventListener('mouseup', function () {
-        // Reset après drop/cancel
         qsa('.group-card').forEach(function (c) { c.draggable = false; });
     });
 
@@ -277,7 +284,7 @@
         if (sm && typeof bootstrap !== 'undefined') settingsModal = new bootstrap.Modal(sm);
     }
 
-    /* ── Groupe ───────────────────────── */
+    /* -- Groupe -- */
     function openGroupModal(groupId) {
         if (!groupModal) { initModals(); }
         if (!groupModal) return;
@@ -311,7 +318,8 @@
                 name: f.elements.name.value,
                 icon: f.elements.icon.value,
                 col_span: parseInt(f.elements.col_span.value) || 1,
-                row_span: parseInt(f.elements.row_span.value) || 1
+                row_span: parseInt(f.elements.row_span.value) || 1,
+                page_id: PAGE_DATA.currentPage || 1
             };
             var eid = f.dataset.editId;
 
@@ -323,12 +331,11 @@
 
             var p = eid ? api('PUT', '/api/groups/' + eid, body)
                         : api('POST', '/api/groups', body);
-            p.then(function () { location.href = '/?edit=1'; })
+            p.then(function () { location.href = editUrl(); })
              .catch(function (err) { alert(err.message); });
         });
     }
 
-    // Annuler la position en attente si le modal est fermé sans soumettre
     var groupModalEl = qs('#groupModal');
     if (groupModalEl) {
         groupModalEl.addEventListener('hidden.bs.modal', function () {
@@ -336,7 +343,7 @@
         });
     }
 
-    /* ── Lien ─────────────────────────── */
+    /* -- Lien -- */
     function openLinkModal(linkId, groupId) {
         if (!linkModal) { initModals(); }
         if (!linkModal) return;
@@ -378,12 +385,12 @@
             var eid = f.dataset.editId;
             var p = eid ? api('PUT', '/api/links/' + eid, body)
                         : api('POST', '/api/links', body);
-            p.then(function () { location.href = '/?edit=1'; })
+            p.then(function () { location.href = editUrl(); })
              .catch(function (err) { alert(err.message); });
         });
     }
 
-    /* ── Réglages ─────────────────────── */
+    /* -- Reglages -- */
     var settingsForm = qs('#settingsForm');
     if (settingsForm) {
         settingsForm.addEventListener('submit', function (e) {
@@ -413,12 +420,12 @@
             Promise.all([
                 api('PUT', '/api/settings', settingsBody),
                 api('PUT', '/api/widgets', widgetsBody)
-            ]).then(function () { location.href = '/?edit=1'; })
+            ]).then(function () { location.href = editUrl(); })
               .catch(function (err) { alert(err.message); });
         });
     }
 
-    /* ── Icon picker ──────────────────── */
+    /* -- Icon picker -- */
     document.addEventListener('click', function (e) {
         var ig = e.target.closest('.ig');
         if (!ig) return;
@@ -429,7 +436,7 @@
         }
     });
 
-    /* ── Upload icône ─────────────────── */
+    /* -- Upload icone -- */
     document.addEventListener('change', function (e) {
         if (!e.target.classList.contains('icon-upload-input')) return;
         var file = e.target.files[0];
@@ -448,14 +455,14 @@
         e.target.value = '';
     });
 
-    /* ── Fetch favicon ────────────────── */
+    /* -- Fetch favicon -- */
     var fetchFavBtn = qs('#fetchFavicon');
     if (fetchFavBtn) {
         fetchFavBtn.addEventListener('click', function () {
             var urlInput = qs('#linkForm input[name="url"]');
             var iconInput = qs('#linkForm input[name="icon"]');
             if (!urlInput || !iconInput || !urlInput.value.trim()) {
-                alert('Renseignez d\'abord l\'URL du lien');
+                alert("Renseignez d'abord l'URL du lien");
                 return;
             }
             fetch('/api/favicon?url=' + encodeURIComponent(urlInput.value.trim()))
@@ -468,7 +475,7 @@
         });
     }
 
-    /* ── Upload fond d'écran ──────────── */
+    /* -- Upload fond d'ecran -- */
     var bgUpload = qs('#bgUploadInput');
     if (bgUpload) {
         bgUpload.addEventListener('change', function () {
@@ -488,6 +495,187 @@
         });
     }
 
+    /* -- Export / Import config -- */
+    var exportBtn = qs('#exportConfigBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            fetch('/api/config/export')
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'fabhome-config.json';
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                })
+                .catch(function (err) { alert('Erreur export : ' + err.message); });
+        });
+    }
+
+    var importInput = qs('#importConfigInput');
+    if (importInput) {
+        importInput.addEventListener('change', function () {
+            var file = importInput.files[0];
+            if (!file) return;
+            if (!confirm('Importer ce fichier va REMPLACER toutes les donnees actuelles. Continuer ?')) {
+                importInput.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                try {
+                    var data = JSON.parse(ev.target.result);
+                    api('POST', '/api/config/import', data)
+                        .then(function () { location.href = '/'; })
+                        .catch(function (err) { alert('Erreur import : ' + err.message); });
+                } catch (ex) {
+                    alert('Fichier JSON invalide');
+                }
+            };
+            reader.readAsText(file);
+            importInput.value = '';
+        });
+    }
+
+    /* -- Pages (CRUD) -- */
+    var pageModal = null;
+    var serviceModal = null;
+
+    function initExtraModals() {
+        var pm = qs('#pageModal');
+        var sm = qs('#serviceModal');
+        if (pm && typeof bootstrap !== 'undefined' && !pageModal) pageModal = new bootstrap.Modal(pm);
+        if (sm && typeof bootstrap !== 'undefined' && !serviceModal) serviceModal = new bootstrap.Modal(sm);
+    }
+
+    function openPageModal(pageId) {
+        initExtraModals();
+        if (!pageModal) return;
+        var form = qs('#pageForm');
+        var title = qs('#pageModalTitle');
+        if (pageId) {
+            var pg = PAGE_DATA.pages.find(function (p) { return p.id === pageId; });
+            title.textContent = 'Modifier la page';
+            form.dataset.editId = pageId;
+            form.elements.name.value = pg ? pg.name : '';
+            form.elements.icon.value = pg ? pg.icon : 'bi-file-earmark';
+        } else {
+            title.textContent = 'Nouvelle page';
+            delete form.dataset.editId;
+            form.reset();
+            form.elements.icon.value = 'bi-file-earmark';
+        }
+        pageModal.show();
+    }
+
+    var pageForm = qs('#pageForm');
+    if (pageForm) {
+        pageForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var body = { name: f.elements.name.value, icon: f.elements.icon.value };
+            var eid = f.dataset.editId;
+            var p = eid ? api('PUT', '/api/pages/' + eid, body)
+                        : api('POST', '/api/pages', body);
+            p.then(function () { location.href = editUrl(); })
+             .catch(function (err) { alert(err.message); });
+        });
+    }
+
+    /* -- Services (CRUD) -- */
+    function openServiceModal(svcId) {
+        initExtraModals();
+        if (!serviceModal) return;
+        var form = qs('#serviceForm');
+        var title = qs('#serviceModalTitle');
+        if (svcId) {
+            var svc = PAGE_DATA.services.find(function (s) { return s.id === svcId; });
+            title.textContent = 'Modifier le service';
+            form.dataset.editId = svcId;
+            form.elements.name.value = svc ? svc.name : '';
+            form.elements.type.value = svc ? svc.type : 'generic';
+            form.elements.url.value = svc ? svc.url : '';
+            form.elements.api_key.value = svc ? svc.api_key : '';
+        } else {
+            title.textContent = 'Ajouter un service';
+            delete form.dataset.editId;
+            form.reset();
+        }
+        serviceModal.show();
+    }
+
+    var serviceForm = qs('#serviceForm');
+    if (serviceForm) {
+        serviceForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var body = {
+                name: f.elements.name.value,
+                type: f.elements.type.value,
+                url: f.elements.url.value,
+                api_key: f.elements.api_key.value
+            };
+            var eid = f.dataset.editId;
+            var p = eid ? api('PUT', '/api/services/' + eid, body)
+                        : api('POST', '/api/services', body);
+            p.then(function () { location.href = editUrl(); })
+             .catch(function (err) { alert(err.message); });
+        });
+    }
+
+    /* -- Chargement des donnees service -- */
+    function loadServices() {
+        var widgets = qsa('.service-widget');
+        widgets.forEach(function (w) {
+            var sid = parseInt(w.dataset.serviceId);
+            var stype = w.dataset.serviceType;
+            var statusEl = qs('#svc-status-' + sid);
+            var dataEl = qs('#svc-data-' + sid);
+
+            fetch('/api/services/' + sid + '/proxy')
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) {
+                        if (statusEl) statusEl.textContent = '\u26A0\uFE0F';
+                        if (dataEl) dataEl.textContent = data.error;
+                        return;
+                    }
+                    if (statusEl) statusEl.textContent = '\u2705';
+                    if (dataEl) renderServiceData(dataEl, stype, data);
+                })
+                .catch(function () {
+                    if (statusEl) statusEl.textContent = '\u274C';
+                });
+        });
+    }
+
+    function renderServiceData(el, stype, data) {
+        var html = '';
+        if (stype === 'pihole') {
+            html = '<span>Requetes : ' + (data.dns_queries_today || '\u2014') + '</span>'
+                 + ' <span>Bloquees : ' + (data.ads_blocked_today || '\u2014') + '</span>';
+        } else if (stype === 'adguard') {
+            var stats = data.stats || data;
+            html = '<span>Requetes : ' + (stats.num_dns_queries || '\u2014') + '</span>'
+                 + ' <span>Bloquees : ' + (stats.num_blocked_filtering || '\u2014') + '</span>';
+        } else if (stype === 'uptimekuma') {
+            if (data.heartbeatList) {
+                var count = Object.keys(data.heartbeatList).length;
+                html = '<span>' + count + ' moniteurs</span>';
+            } else {
+                html = '<span>Connecte</span>';
+            }
+        } else {
+            var keys = Object.keys(data).slice(0, 3);
+            keys.forEach(function (k) {
+                html += '<span class="svc-kv"><strong>' + k + '</strong>: ' + String(data[k]).substring(0, 50) + '</span> ';
+            });
+        }
+        el.innerHTML = html;
+    }
+
     /* ══════════════════════════════════════
        TAILLE DE LA GRILLE (palette)
        ══════════════════════════════════════ */
@@ -497,10 +685,10 @@
         applyBtn.addEventListener('click', function () {
             var newCols = parseInt(qs('#gridColsInput').value) || 4;
             var newRows = parseInt(qs('#gridRowsInput').value) || 3;
-            newCols = Math.max(2, Math.min(8, newCols));
+            newCols = Math.max(2, Math.min(16, newCols));
             newRows = Math.max(1, Math.min(12, newRows));
             api('PUT', '/api/settings', { grid_cols: String(newCols), grid_rows: String(newRows) })
-                .then(function () { location.href = '/?edit=1'; })
+                .then(function () { location.href = editUrl(); })
                 .catch(function (err) { alert(err.message); });
         });
     }
@@ -512,10 +700,9 @@
     var draggingGroupId = null;
     var draggingColSpan = 1;
     var draggingRowSpan = 1;
-    var dragSource = null; // 'grid' | 'palette'
+    var dragSource = null;
     var draggedLink = null;
 
-    // Drag depuis la grille
     if (gridBoard) {
         gridBoard.addEventListener('dragstart', function (e) {
             var card = e.target.closest('.group-card');
@@ -564,14 +751,12 @@
                 grid_row: cell.row,
                 grid_col: cell.col
             }).then(function () {
-                location.href = '/?edit=1';
+                location.href = editUrl();
             }).catch(function (err) { alert(err.message); });
         });
     }
 
-    // Drag depuis la palette (blocs non placés)
     document.addEventListener('dragstart', function (e) {
-        // Lien
         var wrap = e.target.closest('.link-wrap');
         if (wrap && editMode) {
             draggedLink = wrap;
@@ -580,7 +765,6 @@
             e.dataTransfer.setData('text/plain', 'link');
             return;
         }
-        // Palette block
         var block = e.target.closest('.palette-block');
         if (block && editMode) {
             draggingGroupId = parseInt(block.dataset.groupId);
@@ -594,7 +778,6 @@
         }
     });
 
-    // DnD liens dans un groupe
     document.addEventListener('dragover', function (e) {
         if (!draggedLink) return;
         var linksList = e.target.closest('.group-links');
@@ -620,9 +803,7 @@
         }
     });
 
-    // Nettoyage global dragend
     document.addEventListener('dragend', function () {
-        // Groupes
         if (draggingGroupId) {
             qsa('.group-card.dragging, .palette-block.dragging').forEach(function (el) {
                 el.classList.remove('dragging');
@@ -631,7 +812,6 @@
             draggingGroupId = null;
             dragSource = null;
         }
-        // Liens
         if (draggedLink) {
             draggedLink.classList.remove('dragging');
             qsa('.link-wrap.drag-over-link').forEach(function (w) { w.classList.remove('drag-over-link'); });
@@ -651,7 +831,7 @@
     });
 
     /* ══════════════════════════════════════
-       DÉLÉGATION D'ÉVÉNEMENTS (data-action)
+       DELEGATION D'EVENEMENTS (data-action)
        ══════════════════════════════════════ */
 
     document.addEventListener('click', function (e) {
@@ -669,15 +849,15 @@
                 openGroupModal(id);
                 break;
             case 'delete-group':
-                if (confirm('Supprimer le groupe « ' + (btn.dataset.name || '') + ' » et tous ses liens ?')) {
+                if (confirm('Supprimer le groupe \u00AB ' + (btn.dataset.name || '') + ' \u00BB et tous ses liens ?')) {
                     api('DELETE', '/api/groups/' + id)
-                        .then(function () { location.href = '/?edit=1'; })
+                        .then(function () { location.href = editUrl(); })
                         .catch(function (err) { alert(err.message); });
                 }
                 break;
             case 'unplace-group':
                 api('POST', '/api/groups/' + id + '/move', { grid_row: -1, grid_col: 0 })
-                    .then(function () { location.href = '/?edit=1'; })
+                    .then(function () { location.href = editUrl(); })
                     .catch(function (err) { alert(err.message); });
                 break;
             case 'new-link':
@@ -687,15 +867,41 @@
                 openLinkModal(id, null);
                 break;
             case 'delete-link':
-                if (confirm('Supprimer le lien « ' + (btn.dataset.name || '') + ' » ?')) {
+                if (confirm('Supprimer le lien \u00AB ' + (btn.dataset.name || '') + ' \u00BB ?')) {
                     api('DELETE', '/api/links/' + id)
-                        .then(function () { location.href = '/?edit=1'; })
+                        .then(function () { location.href = editUrl(); })
                         .catch(function (err) { alert(err.message); });
                 }
                 break;
             case 'open-settings':
                 if (!settingsModal) initModals();
                 if (settingsModal) settingsModal.show();
+                break;
+            case 'new-page':
+                openPageModal(null);
+                break;
+            case 'edit-current-page':
+                openPageModal(PAGE_DATA.currentPage);
+                break;
+            case 'delete-page':
+                if (confirm('Supprimer cette page et tous ses groupes ?')) {
+                    api('DELETE', '/api/pages/' + id)
+                        .then(function () { location.href = editUrl(); })
+                        .catch(function (err) { alert(err.message); });
+                }
+                break;
+            case 'new-service':
+                openServiceModal(null);
+                break;
+            case 'edit-service':
+                openServiceModal(id);
+                break;
+            case 'delete-service':
+                if (confirm('Supprimer ce service ?')) {
+                    api('DELETE', '/api/services/' + id)
+                        .then(function () { location.href = editUrl(); })
+                        .catch(function (err) { alert(err.message); });
+                }
                 break;
         }
     });
@@ -715,8 +921,8 @@
     setInterval(loadWeather, 1800000);
     loadHealth();
     setInterval(loadHealth, 30000);
+    loadServices();
 
-    // Entrer en mode édition si demandé
     if (PAGE_DATA.editOnLoad) {
         setEditMode(true);
     } else {

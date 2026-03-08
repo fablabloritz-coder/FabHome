@@ -39,12 +39,19 @@ _cache = {}
 @app.route('/')
 def index():
     settings = models.get_settings()
-    groups = models.get_groups()
+    pages = models.get_pages()
+    page_id = request.args.get('page', 1, type=int)
+    groups = models.get_groups(page_id=page_id)
     widgets = {w['type']: w for w in models.get_widgets()}
+    services = models.get_services()
     return render_template('index.html',
                            settings=settings, groups=groups, widgets=widgets,
+                           pages=pages, current_page=page_id,
+                           services=services,
                            groups_json=json.dumps(groups),
-                           widgets_json=json.dumps(widgets))
+                           widgets_json=json.dumps(widgets),
+                           pages_json=json.dumps(pages),
+                           services_json=json.dumps(services))
 
 
 @app.route('/admin')
@@ -77,11 +84,12 @@ def api_create_group():
         return jsonify(error='Nom requis'), 400
     gid = models.create_group(
         name[:100],
-        (data.get('icon') or 'bi-folder')[:50],
+        (data.get('icon') or 'bi-folder')[:500],
         int(data.get('col_span', 1)),
         int(data.get('row_span', 1)),
         int(data.get('grid_row', -1)),
-        int(data.get('grid_col', 0)))
+        int(data.get('grid_col', 0)),
+        page_id=int(data.get('page_id', 1)))
     return jsonify(id=gid), 201
 
 
@@ -93,7 +101,7 @@ def api_update_group(gid):
         return jsonify(error='Nom requis'), 400
     models.update_group(
         gid, name[:100],
-        (data.get('icon') or 'bi-folder')[:50],
+        (data.get('icon') or 'bi-folder')[:500],
         col_span=int(data['col_span']) if 'col_span' in data else None,
         row_span=int(data['row_span']) if 'row_span' in data else None,
         grid_row=int(data['grid_row']) if 'grid_row' in data else None,
@@ -141,7 +149,7 @@ def api_create_link():
         return jsonify(error='URL invalide (HTTP/HTTPS uniquement)'), 400
     lid = models.create_link(
         group_id=int(group_id), name=name[:100], url=url,
-        icon=(data.get('icon') or 'bi-link-45deg')[:50],
+        icon=(data.get('icon') or 'bi-link-45deg')[:500],
         description=(data.get('description') or '')[:200],
         check_status=1 if data.get('check_status') else 0)
     return jsonify(id=lid), 201
@@ -158,7 +166,7 @@ def api_update_link(lid):
     if not url:
         return jsonify(error='URL invalide'), 400
     models.update_link(lid, name[:100], url,
-                       (data.get('icon') or 'bi-link-45deg')[:50],
+                       (data.get('icon') or 'bi-link-45deg')[:500],
                        (data.get('description') or '')[:200],
                        1 if data.get('check_status') else 0,
                        group_id=data.get('group_id'))
@@ -195,6 +203,128 @@ def api_update_widgets():
             models.update_widget(wtype,
                                  1 if wdata.get('enabled') else 0,
                                  wdata.get('config', {}))
+    return jsonify(ok=True)
+
+
+# ── API : Pages ───────────────────────────────────────────
+
+@app.route('/api/pages', methods=['POST'])
+def api_create_page():
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify(error='Nom requis'), 400
+    pid = models.create_page(name[:100], (data.get('icon') or 'bi-file-earmark')[:500])
+    return jsonify(id=pid), 201
+
+
+@app.route('/api/pages/<int:pid>', methods=['PUT'])
+def api_update_page(pid):
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify(error='Nom requis'), 400
+    models.update_page(pid, name[:100], (data.get('icon') or 'bi-file-earmark')[:500])
+    return jsonify(ok=True)
+
+
+@app.route('/api/pages/<int:pid>', methods=['DELETE'])
+def api_delete_page(pid):
+    if pid == 1:
+        return jsonify(error='Impossible de supprimer la page par défaut'), 400
+    models.delete_page(pid)
+    return jsonify(ok=True)
+
+
+@app.route('/api/pages/reorder', methods=['POST'])
+def api_reorder_pages():
+    data = request.get_json() or {}
+    ids = data.get('order', [])
+    if not isinstance(ids, list):
+        return jsonify(error='order requis'), 400
+    models.reorder_pages([int(i) for i in ids])
+    return jsonify(ok=True)
+
+
+# ── API : Services ────────────────────────────────────────
+
+@app.route('/api/services', methods=['POST'])
+def api_create_service():
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify(error='Nom requis'), 400
+    stype = (data.get('type') or 'generic').strip()[:50]
+    url = (data.get('url') or '').strip()[:2000]
+    api_key = (data.get('api_key') or '')[:500]
+    config = data.get('config', {})
+    sid = models.create_service(name[:100], stype, url, api_key, config)
+    return jsonify(id=sid), 201
+
+
+@app.route('/api/services/<int:sid>', methods=['PUT'])
+def api_update_service(sid):
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify(error='Nom requis'), 400
+    models.update_service(
+        sid, name[:100],
+        (data.get('type') or 'generic')[:50],
+        (data.get('url') or '')[:2000],
+        (data.get('api_key') or '')[:500],
+        data.get('config', {}),
+        1 if data.get('enabled', True) else 0)
+    return jsonify(ok=True)
+
+
+@app.route('/api/services/<int:sid>', methods=['DELETE'])
+def api_delete_service(sid):
+    models.delete_service(sid)
+    return jsonify(ok=True)
+
+
+@app.route('/api/services/<int:sid>/proxy')
+def api_service_proxy(sid):
+    """Proxy pour interroger un service externe (évite CORS)."""
+    services = models.get_services()
+    svc = next((s for s in services if s['id'] == sid), None)
+    if not svc or not svc['enabled']:
+        return jsonify(error='Service non trouvé'), 404
+    try:
+        svc_url = svc['url'].rstrip('/')
+        endpoint = svc.get('config', {}).get('endpoint', '')
+        target = svc_url + endpoint
+        req = Request(target)
+        req.add_header('User-Agent', 'FabHome/1.0')
+        if svc.get('api_key'):
+            req.add_header('X-Api-Key', svc['api_key'])
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        resp = urlopen(req, timeout=10, context=ctx)
+        data = json.loads(resp.read().decode())
+        return jsonify(data)
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
+# ── API : Import / Export ─────────────────────────────────
+
+@app.route('/api/config/export')
+def api_export_config():
+    data = models.export_all()
+    return jsonify(data)
+
+
+@app.route('/api/config/import', methods=['POST'])
+def api_import_config():
+    data = request.get_json()
+    if not data or not isinstance(data, dict):
+        return jsonify(error='JSON invalide'), 400
+    if 'settings' not in data and 'groups' not in data:
+        return jsonify(error='Données de configuration requises'), 400
+    models.import_all(data)
     return jsonify(ok=True)
 
 
