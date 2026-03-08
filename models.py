@@ -295,6 +295,7 @@ def create_profile(name, icon='👤', color='#6c757d'):
         'caldav_username': '',
         'caldav_password': '',
         'camera_urls': '',
+        'refresh_interval': '30',
     }.items():
         conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (?, ?, ?)',
                      (profile_id, k, v))

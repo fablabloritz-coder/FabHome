@@ -1018,7 +1018,10 @@ body.edit-mode .group-card {
     font-size: 0.78rem; color: var(--fh-text);
     display: flex; flex-wrap: wrap; gap: 0.5rem;
 }
-.gw-camera { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.gw-camera { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: hidden; }
+.gw-camera-img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.gw-camera-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--fh-text-muted); }
+.gw-camera-placeholder i { font-size: 1.8rem; color: var(--fh-accent); }
 .gw-camera i { font-size: 1.8rem; color: var(--fh-accent); }
 .gw-generic { display: flex; align-items: center; gap: 10px; justify-content: center; color: var(--fh-text-muted); }
 .edit-mode .grid-widget-card:hover .group-overlay { display: flex; }

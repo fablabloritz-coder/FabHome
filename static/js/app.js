@@ -457,6 +457,9 @@
                 if (existing.type === 'service' && form.elements.service_id) {
                     form.elements.service_id.value = (existing.config || {}).service_id || '';
                 }
+                if (existing.type === 'camera' && form.elements.camera_url) {
+                    form.elements.camera_url.value = (existing.config || {}).camera_url || '';
+                }
                 form.elements.icon_size.value = existing.icon_size || 'medium';
                 form.elements.text_size.value = existing.text_size || 'medium';
                 qs('#gridWidgetColSpan').value = existing.col_span || 1;
@@ -481,6 +484,8 @@
             var type = this.value;
             qs('#widgetConfigNote').style.display = type === 'note' ? '' : 'none';
             qs('#widgetConfigWeather').style.display = type === 'weather' ? '' : 'none';
+            var camCfg = qs('#widgetConfigCamera');
+            if (camCfg) camCfg.style.display = type === 'camera' ? '' : 'none';
             var svcCfg = qs('#widgetConfigService');
             if (svcCfg) svcCfg.style.display = type === 'service' ? '' : 'none';
         });
@@ -502,6 +507,8 @@
                 config.longitude = parseFloat(f.elements.weather_lon.value) || 6.18;
             } else if (type === 'service') {
                 config.service_id = parseInt(f.elements.service_id.value) || 0;
+            } else if (type === 'camera') {
+                config.camera_url = f.elements.camera_url ? f.elements.camera_url.value.trim() : '';
             }
             
             var body = {
@@ -542,6 +549,7 @@
                 theme: f.elements.theme.value,
                 background_url: f.elements.background_url.value,
                 search_provider: f.elements.search_provider.value,
+                refresh_interval: f.elements.refresh_interval ? f.elements.refresh_interval.value : '30',
                 caldav_url: f.elements.caldav_url ? f.elements.caldav_url.value : '',
                 caldav_username: f.elements.caldav_username ? f.elements.caldav_username.value : '',
                 caldav_password: f.elements.caldav_password ? f.elements.caldav_password.value : '',
@@ -1190,7 +1198,22 @@
         });
     }
     loadGridWidgetServices();
-    setInterval(loadGridWidgetServices, 30000);
+
+    // ── Grid Widget camera refresh ──
+    function refreshGridWidgetCameras() {
+        qsa('.gw-camera-img').forEach(function(img) {
+            var base = img.dataset.baseSrc || img.getAttribute('src');
+            if (!img.dataset.baseSrc) img.dataset.baseSrc = base.split('?')[0];
+            img.src = img.dataset.baseSrc + '?t=' + Date.now();
+        });
+    }
+
+    // ── Dynamic refresh interval ──
+    var refreshMs = parseInt(PAGE_DATA.settings.refresh_interval || '30') * 1000;
+    if (refreshMs > 0) {
+        setInterval(loadGridWidgetServices, refreshMs);
+        setInterval(refreshGridWidgetCameras, refreshMs);
+    }
 
     /* ══════════════════════════════════════
        GESTION DES PROFILS
@@ -1318,32 +1341,11 @@
         bsModal.show();
     }
 
-    function initCameras() {
-        var cameraWidget = qs('.widget-camera');
-        if (!cameraWidget) return;
-
-        var cameraGrid = qs('.camera-grid', cameraWidget);
-        if (!cameraGrid) return;
-
-        qsa('.camera-img', cameraGrid).forEach(function (img) {
-            // Auto-refresh every 5 seconds
-            setInterval(function () {
-                var src = img.getAttribute('src');
-                if (src && src.indexOf('?') !== -1) {
-                    img.src = src.split('?')[0] + '?t=' + Date.now();
-                } else if (src) {
-                    img.src = src + '?t=' + Date.now();
-                }
-            }, 5000);
-        });
-    }
-
     /* ══════════════════════════════════════
        INITIALISATION
        ══════════════════════════════════════ */
 
     initProfiles();
-    initCameras();
 
     if (PAGE_DATA.editOnLoad) {
         setEditMode(true);

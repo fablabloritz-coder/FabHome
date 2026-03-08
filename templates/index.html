@@ -227,10 +227,13 @@
                     <div class="calendar-events gw-calendar-events"></div>
                 </div>
                 {% elif gw.type == 'camera' %}
-                <div class="gw-card-body gw-camera">
-                    <i class="bi bi-camera-video"></i>
-                    <span>Caméra</span>
-                    <div class="gw-camera-feed"></div>
+                {% set cam_url = gw.config.get('camera_url', '') %}
+                <div class="gw-card-body gw-camera" data-camera-url="{{ cam_url }}">
+                    {% if cam_url %}
+                    <img class="gw-camera-img" src="{{ cam_url }}" alt="Caméra" loading="lazy">
+                    {% else %}
+                    <div class="gw-camera-placeholder"><i class="bi bi-camera-video"></i><span>Aucune URL configurée</span></div>
+                    {% endif %}
                 </div>
                 {% elif gw.type == 'service' %}
                 {% set svc_id = gw.config.get('service_id', 0)|int %}
@@ -550,6 +553,12 @@
                         </div>
                     </div>
                     
+                    <div class="mb-3" id="widgetConfigCamera" style="display: none;">
+                        <label class="form-label">URL du flux caméra (snapshot JPEG)</label>
+                        <input type="text" class="form-control" name="camera_url" placeholder="http://192.168.1.100/snapshot.jpg">
+                        <small class="form-text text-muted">URL d'un snapshot JPEG — rafraîchi automatiquement</small>
+                    </div>
+                    
                     <div class="mb-3" id="widgetConfigService" style="display: none;">
                         <label class="form-label">Service à afficher</label>
                         <select class="form-select" name="service_id" id="gridWidgetServiceId">
@@ -726,6 +735,22 @@
                                     </div>
                                 </div>
                                 <small class="form-text text-muted">CPU, RAM et disque du serveur</small>
+                            </div>
+                            <hr>
+                            <div class="settings-widget-row">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <strong><i class="bi bi-arrow-repeat"></i> Rafraîchissement auto</strong>
+                                </div>
+                                <small class="form-text text-muted">Intervalle de mise à jour des widgets services et caméras</small>
+                                <select class="form-select form-select-sm mt-2" name="refresh_interval">
+                                    {% set ri = settings.get('refresh_interval', '30') %}
+                                    <option value="5" {% if ri=='5' %}selected{% endif %}>5 secondes</option>
+                                    <option value="10" {% if ri=='10' %}selected{% endif %}>10 secondes</option>
+                                    <option value="15" {% if ri=='15' %}selected{% endif %}>15 secondes</option>
+                                    <option value="30" {% if ri=='30' %}selected{% endif %}>30 secondes</option>
+                                    <option value="60" {% if ri=='60' %}selected{% endif %}>60 secondes</option>
+                                    <option value="0" {% if ri=='0' %}selected{% endif %}>Désactivé</option>
+                                </select>
                             </div>
                             <hr>
                             <p class="text-muted mb-3 small"><strong>Connexions</strong> — Paramètres utilisés par les widgets du dashboard.</p>

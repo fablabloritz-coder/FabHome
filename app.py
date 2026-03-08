@@ -177,7 +177,8 @@ def api_update_settings():
         profile_id = get_current_profile_id()
         allowed = {'title', 'theme', 'background_url', 'greeting_name',
                    'search_provider', 'grid_cols', 'grid_rows',
-                   'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls'}
+                   'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls',
+                   'refresh_interval'}
         for k, v in data.items():
             if k in allowed:
                 models.update_setting(k, str(v)[:500], profile_id)
