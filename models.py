@@ -115,6 +115,36 @@ def init_db():
     widgets_cols = [r[1] for r in conn.execute("PRAGMA table_info(widgets)").fetchall()]
     if 'profile_id' not in widgets_cols:
         conn.execute('ALTER TABLE widgets ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1')
+
+    # Migration widgets : l'ancien schéma avait UNIQUE(type), le nouveau a UNIQUE(profile_id, type)
+    # Vérifier si l'ancien index unique existe et recréer la table si nécessaire
+    indexes = conn.execute("PRAGMA index_list(widgets)").fetchall()
+    needs_widget_rebuild = False
+    for idx in indexes:
+        idx_info = conn.execute(f"PRAGMA index_info({idx['name']})").fetchall()
+        col_names = [row['name'] for row in idx_info]
+        if col_names == ['type'] and idx['unique']:
+            needs_widget_rebuild = True
+            break
+    if needs_widget_rebuild:
+        old_widgets = conn.execute('SELECT profile_id, type, config, enabled, sort_order FROM widgets').fetchall()
+        conn.execute('DROP TABLE widgets')
+        conn.execute('''
+            CREATE TABLE widgets (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER NOT NULL DEFAULT 1,
+                type       TEXT    NOT NULL,
+                config     TEXT    NOT NULL DEFAULT '{}',
+                enabled    INTEGER NOT NULL DEFAULT 1,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(profile_id, type),
+                FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+            )
+        ''')
+        for w in old_widgets:
+            conn.execute(
+                'INSERT OR IGNORE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
+                (w['profile_id'], w['type'], w['config'], w['enabled'], w['sort_order']))
     
     settings_cols = [r[1] for r in conn.execute("PRAGMA table_info(settings)").fetchall()]
     if settings_cols and settings_cols[0] != 'profile_id':
@@ -275,16 +305,16 @@ def create_profile(name, icon='👤', color='#6c757d'):
     
     # Créer les widgets par défaut
     for wtype, cfg, en, order in [
-        ('greeting', '{}', 1, 0),
+        ('greeting', '{}', 0, 0),
         ('search',   '{"provider":"google"}', 1, 1),
         ('clock',    '{}', 1, 2),
         ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 3),
         ('health',   '{}', 0, 4),
-        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 0, 5),
+        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 1, 5),
         ('camera',   '{"streams":[]}', 0, 6),
     ]:
         conn.execute(
-            'INSERT INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
+            'INSERT OR IGNORE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
             (profile_id, wtype, cfg, en, order))
     
     conn.commit()

@@ -492,17 +492,70 @@ def api_service_proxy(sid):
         return jsonify(error='Service non trouvé'), 404
     try:
         svc_url = svc['url'].rstrip('/')
-        endpoint = svc.get('config', {}).get('endpoint', '')
-        target = svc_url + endpoint
-        req = Request(target)
-        req.add_header('User-Agent', 'FabHome/1.0')
-        if svc.get('api_key'):
-            req.add_header('X-Api-Key', svc['api_key'])
+        svc_type = svc.get('type', 'generic')
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        resp = urlopen(req, timeout=10, context=ctx)
-        data = json.loads(resp.read().decode())
+        headers = {'User-Agent': 'FabHome/1.0'}
+        if svc.get('api_key'):
+            headers['X-Api-Key'] = svc['api_key']
+
+        def _fetch_json(url):
+            req = Request(url)
+            for k, v in headers.items():
+                req.add_header(k, v)
+            resp = urlopen(req, timeout=10, context=ctx)
+            return json.loads(resp.read().decode())
+
+        # ── PrêtGo : agrège inventaire + personnes
+        if svc_type == 'pretgo':
+            result = {'type': 'pretgo'}
+            try:
+                inv = _fetch_json(svc_url + '/api/inventaire')
+                items = inv if isinstance(inv, list) else inv.get('data', inv.get('items', []))
+                result['total_materiel'] = len(items)
+                etats = {}
+                for it in items:
+                    e = it.get('etat', it.get('état', 'inconnu'))
+                    etats[e] = etats.get(e, 0) + 1
+                result['etats'] = etats
+            except Exception:
+                result['total_materiel'] = None
+            try:
+                pers = _fetch_json(svc_url + '/api/personnes')
+                plist = pers if isinstance(pers, list) else pers.get('data', pers.get('items', []))
+                result['total_personnes'] = len(plist)
+            except Exception:
+                result['total_personnes'] = None
+            return jsonify(result)
+
+        # ── Fabtrack : résumé stats + machines
+        if svc_type == 'fabtrack':
+            result = {'type': 'fabtrack'}
+            try:
+                summary = _fetch_json(svc_url + '/api/stats/summary')
+                result['interventions_total'] = summary.get('interventions_total', 0)
+                result['impression_3d_grammes'] = summary.get('impression_3d_grammes', 0)
+                result['decoupe_m2'] = summary.get('decoupe_m2', 0)
+                result['papier_feuilles'] = summary.get('papier_feuilles', 0)
+                by_type = summary.get('by_type', [])
+                result['by_type'] = by_type[:5] if isinstance(by_type, list) else []
+            except Exception:
+                result['interventions_total'] = None
+            try:
+                ref = _fetch_json(svc_url + '/api/reference')
+                machines = ref.get('machines', [])
+                result['machines_total'] = len(machines)
+                result['machines_actives'] = len([m for m in machines if m.get('actif')])
+                result['machines'] = [{'nom': m.get('nom', ''), 'statut': m.get('statut', '')} for m in machines[:8]]
+            except Exception:
+                result['machines_total'] = None
+            return jsonify(result)
+
+        # ── Générique / autres types
+        endpoint = svc.get('config', {}).get('endpoint', '')
+        target = svc_url + endpoint
+        data = _fetch_json(target)
         return jsonify(data)
     except Exception as e:
         return jsonify(error=str(e)), 502

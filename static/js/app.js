@@ -799,7 +799,41 @@
 
     function renderServiceData(el, stype, data) {
         var html = '';
-        if (stype === 'pihole') {
+        if (stype === 'pretgo') {
+            var mat = data.total_materiel;
+            var pers = data.total_personnes;
+            html += '<div class="svc-app-block">';
+            if (mat !== null && mat !== undefined) {
+                html += '<div class="svc-stat"><i class="bi bi-box-seam"></i> <strong>' + mat + '</strong> matériels</div>';
+                if (data.etats) {
+                    var etats = data.etats;
+                    var eKeys = Object.keys(etats);
+                    html += '<div class="svc-etats">';
+                    eKeys.forEach(function(k) { html += '<span class="svc-badge">' + escHtml(k) + ' : ' + etats[k] + '</span> '; });
+                    html += '</div>';
+                }
+            }
+            if (pers !== null && pers !== undefined) {
+                html += '<div class="svc-stat"><i class="bi bi-people"></i> <strong>' + pers + '</strong> personnes</div>';
+            }
+            html += '</div>';
+        } else if (stype === 'fabtrack') {
+            html += '<div class="svc-app-block">';
+            if (data.interventions_total !== null && data.interventions_total !== undefined) {
+                html += '<div class="svc-stat"><i class="bi bi-clipboard-data"></i> <strong>' + data.interventions_total + '</strong> interventions</div>';
+                if (data.impression_3d_grammes) html += '<div class="svc-stat"><i class="bi bi-printer"></i> 3D : ' + data.impression_3d_grammes + ' g</div>';
+                if (data.decoupe_m2) html += '<div class="svc-stat"><i class="bi bi-scissors"></i> Découpe : ' + data.decoupe_m2 + ' m²</div>';
+            }
+            if (data.machines && data.machines.length) {
+                html += '<div class="svc-machines">';
+                data.machines.forEach(function(m) {
+                    var cls = m.statut === 'disponible' ? 'svc-ok' : (m.statut === 'hors_service' ? 'svc-err' : 'svc-warn');
+                    html += '<span class="svc-machine ' + cls + '" title="' + escHtml(m.statut) + '">' + escHtml(m.nom) + '</span> ';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        } else if (stype === 'pihole') {
             html = '<span>Requetes : ' + (data.dns_queries_today || '\u2014') + '</span>'
                  + ' <span>Bloquees : ' + (data.ads_blocked_today || '\u2014') + '</span>';
         } else if (stype === 'adguard') {
@@ -816,7 +850,7 @@
         } else {
             var keys = Object.keys(data).slice(0, 3);
             keys.forEach(function (k) {
-                html += '<span class="svc-kv"><strong>' + k + '</strong>: ' + String(data[k]).substring(0, 50) + '</span> ';
+                html += '<span class="svc-kv"><strong>' + escHtml(k) + '</strong>: ' + escHtml(String(data[k]).substring(0, 50)) + '</span> ';
             });
         }
         el.innerHTML = html;

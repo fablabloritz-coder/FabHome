@@ -609,6 +609,23 @@ button.page-tab { border: 1px dashed var(--fh-card-border); }
 }
 .svc-kv { display: inline-block; }
 
+/* ── PretGo / Fabtrack service widgets ── */
+.svc-app-block { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.svc-stat { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
+.svc-stat i { font-size: 0.85rem; color: var(--fh-accent); }
+.svc-etats { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 2px; }
+.svc-badge {
+    font-size: 0.7rem; padding: 1px 6px; border-radius: 8px;
+    background: rgba(255,255,255,0.08); color: var(--fh-text-muted);
+}
+.svc-machines { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.svc-machine {
+    font-size: 0.7rem; padding: 2px 7px; border-radius: 8px; font-weight: 500;
+}
+.svc-machine.svc-ok { background: rgba(25,135,84,0.2); color: #63e6a0; }
+.svc-machine.svc-warn { background: rgba(255,193,7,0.2); color: #ffc107; }
+.svc-machine.svc-err { background: rgba(220,53,69,0.2); color: #f77; }
+
 /* ══════════════════════════════════════════
    CONTENEUR PRINCIPAL (grille + palette)
    ══════════════════════════════════════════ */
