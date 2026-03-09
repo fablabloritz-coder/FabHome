@@ -1333,6 +1333,109 @@
         bsModal.show();
     }
     /* ══════════════════════════════════════
+       FABLAB SUITE
+       ══════════════════════════════════════ */
+
+    // Add suite app from settings tab
+    function suiteAddApp(urlInput) {
+        const url = (urlInput.value || '').trim();
+        if (!url) return;
+        urlInput.disabled = true;
+        api('/api/suite/apps', 'POST', { url })
+            .then(r => {
+                if (r.error) { showToast(r.error, 'danger'); urlInput.disabled = false; return; }
+                showToast(`${r.app.name} ajouté !`, 'success');
+                setTimeout(() => location.reload(), 500);
+            })
+            .catch(() => { showToast('Erreur de connexion', 'danger'); urlInput.disabled = false; });
+    }
+
+    const suiteAddBtn = qs('#suiteAddBtn');
+    if (suiteAddBtn) suiteAddBtn.onclick = () => suiteAddApp(qs('#suiteUrlInput'));
+
+    const suiteAppAddBtn = qs('#suiteAppAdd');
+    if (suiteAppAddBtn) suiteAppAddBtn.onclick = () => suiteAddApp(qs('#suiteAppUrl'));
+
+    // Delete suite app
+    document.addEventListener('click', e => {
+        const del = e.target.closest('[data-action="delete-suite-app"]');
+        if (del) {
+            const id = del.dataset.id;
+            if (!confirm('Retirer cette application de la suite ?')) return;
+            api(`/api/suite/apps/${id}`, 'DELETE').then(() => location.reload());
+        }
+    });
+
+    // Refresh all
+    const suiteRefreshBtn = qs('#suiteRefreshBtn');
+    if (suiteRefreshBtn) suiteRefreshBtn.onclick = () => {
+        suiteRefreshBtn.disabled = true;
+        suiteRefreshBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Rafraîchissement...';
+        api('/api/suite/apps/refresh', 'POST').then(results => {
+            showToast('Applications rafraîchies', 'success');
+            setTimeout(() => location.reload(), 500);
+        }).catch(() => { showToast('Erreur', 'danger'); suiteRefreshBtn.disabled = false; });
+    };
+
+    // Suite widget: load dashboard data
+    function loadSuiteDashboard() {
+        qsa('.gw-fabsuite').forEach(el => {
+            api('/api/suite/dashboard').then(apps => {
+                const container = el.querySelector('.gw-fabsuite-apps');
+                const widgetArea = el.querySelector('.gw-fabsuite-widgets');
+                if (!apps.length) return;
+
+                // Update status dots
+                apps.forEach(a => {
+                    const card = container.querySelector(`[data-suite-app-id="${a.id}"]`);
+                    if (card) {
+                        const dot = card.querySelector('.suite-app-status');
+                        if (dot) {
+                            dot.className = 'suite-app-status suite-status-' + a.status;
+                            dot.title = a.status;
+                        }
+                    }
+                });
+
+                // Render widget badges
+                if (widgetArea) {
+                    let html = '';
+                    apps.forEach(a => {
+                        a.widgets.forEach(w => {
+                            if (w.error) return;
+                            const meta = w._meta || {};
+                            if (meta.type === 'counter' && w.value !== undefined) {
+                                html += `<span class="suite-widget-badge" style="border-left:3px solid ${a.color}">
+                                    ${escHtml(meta.label)} <span class="suite-wb-value">${w.value}</span>
+                                </span>`;
+                            }
+                        });
+                    });
+                    widgetArea.innerHTML = html;
+                }
+            }).catch(() => {});
+        });
+    }
+
+    // Suite widget refresh button
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.gw-suite-refresh');
+        if (btn) {
+            btn.classList.add('spin');
+            api('/api/suite/apps/refresh', 'POST').then(() => {
+                loadSuiteDashboard();
+                setTimeout(() => btn.classList.remove('spin'), 1000);
+            });
+        }
+    });
+
+    // Load suite dashboard on init + interval
+    if (qsa('.gw-fabsuite').length) {
+        loadSuiteDashboard();
+        setInterval(loadSuiteDashboard, 120000); // 2 min
+    }
+
+    /* ══════════════════════════════════════
        INITIALISATION
        ══════════════════════════════════════ */
     initProfiles();
