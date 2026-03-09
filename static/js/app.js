@@ -1,18 +1,14 @@
 /* FabHome — Logique : grille configurable, DnD avec snap, CRUD, widgets, pages, services */
-
 (function () {
     'use strict';
-
     /* ══════════════════════════════════════
        HELPERS
        ══════════════════════════════════════ */
-
     function escHtml(str) {
         var d = document.createElement('div');
         d.textContent = str;
         return d.innerHTML;
     }
-
     function api(method, url, body) {
         var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify(body);
@@ -22,10 +18,23 @@
             return r.json();
         });
     }
-
+    function showToast(message, type) {
+        var container = document.getElementById('toastContainer');
+        if (!container) { window.alert(message); return; }
+        var icon = type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
+        var bg = type === 'success' ? 'text-bg-success' : 'text-bg-danger';
+        var el = document.createElement('div');
+        el.className = 'toast align-items-center ' + bg + ' border-0';
+        el.setAttribute('role', 'alert');
+        el.innerHTML = '<div class="d-flex"><div class="toast-body"><i class="bi ' + icon + ' me-2"></i>' + escHtml(message) + '</div>'
+            + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+        container.appendChild(el);
+        var toast = new bootstrap.Toast(el, { delay: 5000 });
+        el.addEventListener('hidden.bs.toast', function () { el.remove(); });
+        toast.show();
+    }
     function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
     function qsa(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
-
     function findGroup(id) {
         return PAGE_DATA.groups.find(function (g) { return g.id === id; });
     }
@@ -38,22 +47,18 @@
         }
         return null;
     }
-
     function editUrl() {
         var pg = PAGE_DATA.currentPage;
         return pg && pg !== 1 ? '/?page=' + pg + '&edit=1' : '/?edit=1';
     }
-
     /* ══════════════════════════════════════
        ETAT DE LA GRILLE
        ══════════════════════════════════════ */
-
     var gridBoard = qs('#gridBoard');
     var highlight = qs('#gridHighlight');
     var gridCols = parseInt(PAGE_DATA.settings.grid_cols) || 4;
     var gridRows = parseInt(PAGE_DATA.settings.grid_rows) || 3;
     var occupiedMap = {};
-
     function buildOccupiedMap() {
         occupiedMap = {};
         PAGE_DATA.groups.forEach(function (g) {
@@ -73,7 +78,6 @@
             }
         });
     }
-
     function canPlace(row, col, colSpan, rowSpan, excludeId) {
         if (col < 0 || row < 0 || col + colSpan > gridCols || row + rowSpan > gridRows) return false;
         for (var r = row; r < row + rowSpan; r++) {
@@ -84,7 +88,6 @@
         }
         return true;
     }
-
     function getCellFromPoint(x, y) {
         if (!gridBoard) return null;
         var rect = gridBoard.getBoundingClientRect();
@@ -98,13 +101,10 @@
             col: Math.max(0, Math.min(gridCols - 1, col))
         };
     }
-
     /* ══════════════════════════════════════
        CELLULES VIDES (mode edition)
        ══════════════════════════════════════ */
-
     var pendingPosition = null;
-
     function renderEmptyCells() {
         qsa('.grid-cell-empty', gridBoard).forEach(function (e) { e.remove(); });
         if (!editMode || !gridBoard) return;
@@ -125,7 +125,6 @@
             }
         }
     }
-
     function onEmptyCellClick(e) {
         pendingPosition = {
             row: parseInt(this.dataset.row),
@@ -163,7 +162,6 @@
             });
         }, 0);
     }
-
     function updateUnplacedSection() {
         var section = qs('#unplacedSection');
         var list = qs('#unplacedList');
@@ -171,11 +169,9 @@
         var unplaced = PAGE_DATA.groups.filter(function (g) { return g.grid_row < 0; });
         section.style.display = unplaced.length > 0 ? '' : 'none';
     }
-
     /* ══════════════════════════════════════
        WIDGETS (horloge, accueil, meteo, recherche)
        ══════════════════════════════════════ */
-
     function updateClock() {
         var t = qs('#header-time'), d = qs('#header-date');
         if (!t) return;
@@ -185,7 +181,6 @@
             weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
         });
     }
-
     function loadWeather() {
         var el = qs('#weather-widget');
         if (!el) return;
@@ -197,7 +192,6 @@
             if (ic) ic.className = 'bi ' + weatherIcon(d.weather_code);
         }).catch(function () {});
     }
-
     function weatherIcon(c) {
         if (c === 0) return 'bi-sun';
         if (c <= 3)  return 'bi-cloud-sun';
@@ -209,7 +203,6 @@
         if (c <= 99) return 'bi-cloud-lightning-rain';
         return 'bi-cloud';
     }
-
     var searchForm = qs('#search-form');
     if (searchForm) {
         searchForm.addEventListener('submit', function (e) {
@@ -226,7 +219,6 @@
             window.open((providers[sp] || providers.google) + encodeURIComponent(q), '_blank');
         });
     }
-
     function checkStatuses() {
         var dots = qsa('[data-status-id]');
         if (!dots.length) return;
@@ -238,7 +230,6 @@
             }
         }).catch(function () {});
     }
-
     function loadHealth() {
         var w = qs('#health-widget-header');
         if (!w) return;
@@ -251,28 +242,22 @@
             });
         }).catch(function () {});
     }
-
     /* ══════════════════════════════════════
        MODE EDITION
        ══════════════════════════════════════ */
-
     var editMode = false;
     var editBtn = qs('#editToggle');
     var editIcon = qs('#editToggleIcon');
-
     function setEditMode(on) {
         editMode = on;
         document.body.classList.toggle('edit-mode', on);
         if (editBtn) editBtn.classList.toggle('active', on);
         if (editIcon) editIcon.className = on ? 'bi bi-check-lg' : 'bi bi-pencil';
-
         qsa('.group-card').forEach(function (c) { c.draggable = false; });
         qsa('.palette-block').forEach(function (b) { b.draggable = on; });
         qsa('.link-wrap').forEach(function (w) { w.draggable = on; });
-
         renderEmptyCells();
         updateUnplacedSection();
-
         try { sessionStorage.setItem('fh_edit', on ? '1' : '0'); } catch (e) {}
         var pageParam = PAGE_DATA.currentPage && PAGE_DATA.currentPage !== 1 ? 'page=' + PAGE_DATA.currentPage : '';
         if (on) {
@@ -281,11 +266,9 @@
             history.replaceState(null, '', pageParam ? '/?' + pageParam : '/');
         }
     }
-
     if (editBtn) {
         editBtn.addEventListener('click', function () { setEditMode(!editMode); });
     }
-
     document.addEventListener('mousedown', function (e) {
         if (!editMode) return;
         var handle = e.target.closest('.drag-handle');
@@ -296,15 +279,12 @@
     document.addEventListener('mouseup', function () {
         qsa('.group-card, .grid-widget-card').forEach(function (c) { c.draggable = false; });
     });
-
     /* ══════════════════════════════════════
        MODALES
        ══════════════════════════════════════ */
-
     var groupModal = null;
     var linkModal = null;
     var settingsModal = null;
-
     function initModals() {
         var gm = qs('#groupModal');
         var lm = qs('#linkModal');
@@ -313,7 +293,6 @@
         if (lm && typeof bootstrap !== 'undefined') linkModal = new bootstrap.Modal(lm);
         if (sm && typeof bootstrap !== 'undefined') settingsModal = new bootstrap.Modal(sm);
     }
-
     /* -- Groupe -- */
     function openGroupModal(groupId) {
         if (!groupModal) { initModals(); }
@@ -342,7 +321,6 @@
         }
         groupModal.show();
     }
-
     var groupForm = qs('#groupForm');
     if (groupForm) {
         groupForm.addEventListener('submit', function (e) {
@@ -358,27 +336,23 @@
                 page_id: PAGE_DATA.currentPage || 1
             };
             var eid = f.dataset.editId;
-
             if (!eid && pendingPosition) {
                 body.grid_row = pendingPosition.row;
                 body.grid_col = pendingPosition.col;
                 pendingPosition = null;
             }
-
             var p = eid ? api('PUT', '/api/groups/' + eid, body)
                         : api('POST', '/api/groups', body);
             p.then(function () { location.href = editUrl(); })
-             .catch(function (err) { alert(err.message); });
+             .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     var groupModalEl = qs('#groupModal');
     if (groupModalEl) {
         groupModalEl.addEventListener('hidden.bs.modal', function () {
             pendingPosition = null;
         });
     }
-
     /* -- Lien -- */
     function openLinkModal(linkId, groupId) {
         if (!linkModal) { initModals(); }
@@ -404,7 +378,6 @@
         }
         linkModal.show();
     }
-
     var linkForm = qs('#linkForm');
     if (linkForm) {
         linkForm.addEventListener('submit', function (e) {
@@ -422,10 +395,9 @@
             var p = eid ? api('PUT', '/api/links/' + eid, body)
                         : api('POST', '/api/links', body);
             p.then(function () { location.href = editUrl(); })
-             .catch(function (err) { alert(err.message); });
+             .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     /* -- Grid Widget (standalone on board) -- */
     var gridWidgetModal = null;
     
@@ -527,20 +499,26 @@
             var p = eid ? api('PUT', '/api/grid-widgets/' + eid, body)
                         : api('POST', '/api/grid-widgets', body);
             p.then(function () { location.href = editUrl(); })
-             .catch(function (err) { alert(err.message); });
+             .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     var gridWidgetModalEl = qs('#gridWidgetModal');
     if (gridWidgetModalEl) {
         gridWidgetModalEl.addEventListener('hidden.bs.modal', function () {
             pendingPosition = null;
         });
     }
-
     /* -- Reglages -- */
     var settingsForm = qs('#settingsForm');
     if (settingsForm) {
+        // Toggle custom theme options visibility
+        var themeSelect = settingsForm.elements.theme;
+        if (themeSelect) {
+            themeSelect.addEventListener('change', function () {
+                var box = qs('#customThemeOptions');
+                if (box) box.style.display = themeSelect.value === 'custom' ? 'block' : 'none';
+            });
+        }
         settingsForm.addEventListener('submit', function (e) {
             e.preventDefault();
             var f = e.target;
@@ -555,8 +533,13 @@
                 caldav_password: f.elements.caldav_password ? f.elements.caldav_password.value : '',
                 camera_urls: f.elements.camera_urls ? f.elements.camera_urls.value : ''
             };
+            if (f.elements.theme.value === 'custom') {
+                settingsBody.custom_accent = f.elements.custom_accent ? f.elements.custom_accent.value : '#ff6b35';
+                settingsBody.custom_bg = f.elements.custom_bg ? f.elements.custom_bg.value : '#0f0f1a';
+                settingsBody.custom_card_bg = f.elements.custom_card_bg ? f.elements.custom_card_bg.value : '#1a1a2e';
+                settingsBody.custom_text = f.elements.custom_text ? f.elements.custom_text.value : '#e0e0e0';
+            }
             var widgetsBody = {
-                greeting: { enabled: false, config: {} },
                 clock: { enabled: f.elements.clock_enabled.checked, config: {} },
                 search: { enabled: f.elements.search_enabled.checked, config: {} },
                 weather: {
@@ -575,10 +558,9 @@
                 api('PUT', '/api/settings', settingsBody),
                 api('PUT', '/api/widgets', widgetsBody)
             ]).then(function () { location.href = editUrl(); })
-              .catch(function (err) { alert(err.message); });
+              .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     /* -- Icon picker -- */
     document.addEventListener('click', function (e) {
         var ig = e.target.closest('.ig');
@@ -589,7 +571,6 @@
             if (input) input.value = ig.dataset.v;
         }
     });
-
     /* -- Upload icone -- */
     document.addEventListener('change', function (e) {
         if (!e.target.classList.contains('icon-upload-input')) return;
@@ -600,15 +581,14 @@
         fetch('/api/upload/icon', { method: 'POST', body: formData })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (d.error) { alert(d.error); return; }
+                if (d.error) { showToast(d.error, 'error'); return; }
                 var targetForm = e.target.dataset.target;
                 var form = qs('#' + targetForm);
                 if (form) form.elements.icon.value = d.url;
             })
-            .catch(function (err) { alert('Erreur upload : ' + err.message); });
+            .catch(function (err) { showToast('Erreur upload : ' + err.message, 'error'); });
         e.target.value = '';
     });
-
     /* -- Fetch favicon -- */
     var fetchFavBtn = qs('#fetchFavicon');
     if (fetchFavBtn) {
@@ -616,19 +596,18 @@
             var urlInput = qs('#linkForm input[name="url"]');
             var iconInput = qs('#linkForm input[name="icon"]');
             if (!urlInput || !iconInput || !urlInput.value.trim()) {
-                alert("Renseignez d'abord l'URL du lien");
+                showToast("Renseignez d'abord l'URL du lien", 'error');
                 return;
             }
             fetch('/api/favicon?url=' + encodeURIComponent(urlInput.value.trim()))
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
-                    if (d.error) { alert(d.error); return; }
+                    if (d.error) { showToast(d.error, 'error'); return; }
                     iconInput.value = d.icon;
                 })
-                .catch(function (err) { alert('Erreur : ' + err.message); });
+                .catch(function (err) { showToast('Erreur : ' + err.message, 'error'); });
         });
     }
-
     /* -- Upload fond d'ecran -- */
     var bgUpload = qs('#bgUploadInput');
     if (bgUpload) {
@@ -640,15 +619,14 @@
             fetch('/api/upload/background', { method: 'POST', body: formData })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
-                    if (d.error) { alert(d.error); return; }
+                    if (d.error) { showToast(d.error, 'error'); return; }
                     var urlInput = qs('#settingsForm input[name="background_url"]');
                     if (urlInput) urlInput.value = d.url;
                 })
-                .catch(function (err) { alert('Erreur upload : ' + err.message); });
+                .catch(function (err) { showToast('Erreur upload : ' + err.message, 'error'); });
             bgUpload.value = '';
         });
     }
-
     /* -- Export / Import config -- */
     var exportBtn = qs('#exportConfigBtn');
     if (exportBtn) {
@@ -664,10 +642,9 @@
                     a.click();
                     URL.revokeObjectURL(a.href);
                 })
-                .catch(function (err) { alert('Erreur export : ' + err.message); });
+                .catch(function (err) { showToast('Erreur export : ' + err.message, 'error'); });
         });
     }
-
     var importInput = qs('#importConfigInput');
     if (importInput) {
         importInput.addEventListener('change', function () {
@@ -683,27 +660,24 @@
                     var data = JSON.parse(ev.target.result);
                     api('POST', '/api/config/import', data)
                         .then(function () { location.href = '/'; })
-                        .catch(function (err) { alert('Erreur import : ' + err.message); });
+                        .catch(function (err) { showToast('Erreur import : ' + err.message, 'error'); });
                 } catch (ex) {
-                    alert('Fichier JSON invalide');
+                    showToast('Fichier JSON invalide', 'error');
                 }
             };
             reader.readAsText(file);
             importInput.value = '';
         });
     }
-
     /* -- Pages (CRUD) -- */
     var pageModal = null;
     var serviceModal = null;
-
     function initExtraModals() {
         var pm = qs('#pageModal');
         var sm = qs('#serviceModal');
         if (pm && typeof bootstrap !== 'undefined' && !pageModal) pageModal = new bootstrap.Modal(pm);
         if (sm && typeof bootstrap !== 'undefined' && !serviceModal) serviceModal = new bootstrap.Modal(sm);
     }
-
     function openPageModal(pageId) {
         initExtraModals();
         if (!pageModal) return;
@@ -723,7 +697,6 @@
         }
         pageModal.show();
     }
-
     var pageForm = qs('#pageForm');
     if (pageForm) {
         pageForm.addEventListener('submit', function (e) {
@@ -734,10 +707,9 @@
             var p = eid ? api('PUT', '/api/pages/' + eid, body)
                         : api('POST', '/api/pages', body);
             p.then(function () { location.href = editUrl(); })
-             .catch(function (err) { alert(err.message); });
+             .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     /* -- Services (CRUD) -- */
     function openServiceModal(svcId) {
         initExtraModals();
@@ -759,7 +731,6 @@
         }
         serviceModal.show();
     }
-
     var serviceForm = qs('#serviceForm');
     if (serviceForm) {
         serviceForm.addEventListener('submit', function (e) {
@@ -775,10 +746,9 @@
             var p = eid ? api('PUT', '/api/services/' + eid, body)
                         : api('POST', '/api/services', body);
             p.then(function () { location.href = editUrl(); })
-             .catch(function (err) { alert(err.message); });
+             .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     /* -- Chargement des donnees service -- */
     function renderServiceData(el, stype, data) {
         var html = '';
@@ -841,6 +811,72 @@
             } else {
                 html = '<span>Connecte</span>';
             }
+        } else if (stype === 'docker') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-box"></i> <strong>' + (data.total || 0) + '</strong> containers';
+            html += ' (<span class="text-success">' + (data.running || 0) + ' up</span>';
+            if (data.stopped) html += ', <span class="text-warning">' + data.stopped + ' off</span>';
+            html += ')</div>';
+            if (data.containers && data.containers.length) {
+                html += '<div class="svc-machines">';
+                data.containers.forEach(function(c) {
+                    var cls = c.state === 'running' ? 'svc-ok' : 'svc-err';
+                    html += '<span class="svc-machine ' + cls + '" title="' + escHtml(c.status) + '">' + escHtml(c.name) + '</span> ';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        } else if (stype === 'portainer') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-hdd-stack"></i> <strong>' + (data.endpoints || 0) + '</strong> endpoints</div>';
+            html += '<div class="svc-stat"><i class="bi bi-box"></i> <strong>' + (data.containers_running || 0) + '</strong> running / ' + (data.containers_total || 0) + ' total</div>';
+            html += '</div>';
+        } else if (stype === 'proxmox') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-server"></i> <strong>' + (data.nodes || 0) + '</strong> nœuds</div>';
+            if (data.node_list && data.node_list.length) {
+                html += '<div class="svc-machines">';
+                data.node_list.forEach(function(n) {
+                    var cls = n.status === 'online' ? 'svc-ok' : 'svc-err';
+                    html += '<span class="svc-machine ' + cls + '" title="CPU: ' + n.cpu + '%">' + escHtml(n.name) + '</span> ';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        } else if (stype === 'plex') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-film"></i> <strong>' + (data.libraries || 0) + '</strong> bibliothèques</div>';
+            html += '<div class="svc-stat"><i class="bi bi-play-circle"></i> <strong>' + (data.active_streams || 0) + '</strong> flux actifs</div>';
+            if (data.library_list && data.library_list.length) {
+                html += '<div class="svc-etats">';
+                data.library_list.forEach(function(l) { html += '<span class="svc-badge">' + escHtml(l.title) + '</span> '; });
+                html += '</div>';
+            }
+            html += '</div>';
+        } else if (stype === 'radarr') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-camera-reels"></i> <strong>' + (data.total || 0) + '</strong> films</div>';
+            html += '<div class="svc-stat"><i class="bi bi-eye"></i> ' + (data.monitored || 0) + ' surveillés, <strong>' + (data.has_file || 0) + '</strong> dispo</div>';
+            if (data.missing) html += '<div class="svc-stat text-warning"><i class="bi bi-exclamation-circle"></i> ' + data.missing + ' manquants</div>';
+            html += '</div>';
+        } else if (stype === 'sonarr') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-tv"></i> <strong>' + (data.total || 0) + '</strong> séries</div>';
+            html += '<div class="svc-stat"><i class="bi bi-collection-play"></i> ' + (data.episodes_have || 0) + ' / ' + (data.episodes_total || 0) + ' épisodes</div>';
+            html += '</div>';
+        } else if (stype === 'truenas') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-device-hdd"></i> <strong>' + (data.pools || 0) + '</strong> pools</div>';
+            if (data.pool_list && data.pool_list.length) {
+                html += '<div class="svc-machines">';
+                data.pool_list.forEach(function(p) {
+                    var cls = p.healthy ? 'svc-ok' : 'svc-err';
+                    html += '<span class="svc-machine ' + cls + '" title="' + escHtml(p.status) + '">' + escHtml(p.name) + '</span> ';
+                });
+                html += '</div>';
+            }
+            if (data.alerts) html += '<div class="svc-stat text-warning"><i class="bi bi-bell"></i> ' + data.alerts + ' alertes</div>';
+            html += '</div>';
         } else {
             var keys = Object.keys(data).slice(0, 3);
             keys.forEach(function (k) {
@@ -849,11 +885,9 @@
         }
         el.innerHTML = html;
     }
-
     /* ══════════════════════════════════════
        TAILLE DE LA GRILLE (palette)
        ══════════════════════════════════════ */
-
     var applyBtn = qs('#applyGridSize');
     if (applyBtn) {
         applyBtn.addEventListener('click', function () {
@@ -863,21 +897,18 @@
             newRows = Math.max(1, Math.min(12, newRows));
             api('PUT', '/api/settings', { grid_cols: String(newCols), grid_rows: String(newRows) })
                 .then(function () { location.href = editUrl(); })
-                .catch(function (err) { alert(err.message); });
+                .catch(function (err) { showToast(err.message, 'error'); });
         });
     }
-
     /* ══════════════════════════════════════
        DRAG & DROP — GROUPES (grille + palette)
        ══════════════════════════════════════ */
-
     var draggingGroupId = null;
     var draggingGridWidgetId = null;
     var draggingColSpan = 1;
     var draggingRowSpan = 1;
     var dragSource = null;
     var draggedLink = null;
-
     if (gridBoard) {
         gridBoard.addEventListener('dragstart', function (e) {
             if (e.target.closest('.link-wrap')) return;
@@ -903,15 +934,12 @@
                 e.dataTransfer.setData('text/plain', 'gridwidget');
             }
         });
-
         gridBoard.addEventListener('dragover', function (e) {
             if (!draggingGroupId && !draggingGridWidgetId) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-
             var cell = getCellFromPoint(e.clientX, e.clientY);
             if (!cell || !highlight) return;
-
             var excludeId = draggingGroupId ? ('g_' + draggingGroupId) : ('w_' + draggingGridWidgetId);
             var ok = canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, excludeId);
             highlight.style.gridColumn = (cell.col + 1) + ' / span ' + draggingColSpan;
@@ -919,18 +947,15 @@
             highlight.classList.add('visible');
             highlight.classList.toggle('invalid', !ok);
         });
-
         gridBoard.addEventListener('dragleave', function (e) {
             if (!e.relatedTarget || !gridBoard.contains(e.relatedTarget)) {
                 if (highlight) highlight.classList.remove('visible');
             }
         });
-
         gridBoard.addEventListener('drop', function (e) {
             e.preventDefault();
             var cell = getCellFromPoint(e.clientX, e.clientY);
             if (!cell) return;
-
             if (draggingGroupId) {
                 var excludeId = 'g_' + draggingGroupId;
                 if (!canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, excludeId)) return;
@@ -939,7 +964,7 @@
                     grid_col: cell.col
                 }).then(function () {
                     location.href = editUrl();
-                }).catch(function (err) { alert(err.message); });
+                }).catch(function (err) { showToast(err.message, 'error'); });
             } else if (draggingGridWidgetId) {
                 var excludeId2 = 'w_' + draggingGridWidgetId;
                 if (!canPlace(cell.row, cell.col, draggingColSpan, draggingRowSpan, excludeId2)) return;
@@ -948,11 +973,10 @@
                     grid_col: cell.col
                 }).then(function () {
                     location.href = editUrl();
-                }).catch(function (err) { alert(err.message); });
+                }).catch(function (err) { showToast(err.message, 'error'); });
             }
         });
     }
-
     document.addEventListener('dragstart', function (e) {
         var wrap = e.target.closest('.link-wrap');
         if (wrap && editMode) {
@@ -974,24 +998,20 @@
             e.dataTransfer.setData('text/plain', 'group');
         }
     });
-
     document.addEventListener('dragover', function (e) {
         if (!draggedLink) return;
         var linksList = e.target.closest('.group-links');
         if (!linksList) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-
         var wraps = qsa('.link-wrap:not(.dragging)', linksList);
         wraps.forEach(function (w) { w.classList.remove('drag-over-link'); });
-
         var closest = null;
         wraps.forEach(function (w) {
             var rect = w.getBoundingClientRect();
             var mid = rect.top + rect.height / 2;
             if (e.clientY < mid && !closest) closest = w;
         });
-
         if (closest) {
             closest.classList.add('drag-over-link');
             linksList.insertBefore(draggedLink, closest);
@@ -999,7 +1019,6 @@
             linksList.appendChild(draggedLink);
         }
     });
-
     document.addEventListener('dragend', function () {
         if (draggingGroupId || draggingGridWidgetId) {
             qsa('.group-card.dragging, .palette-block.dragging, .grid-widget-card.dragging').forEach(function (el) {
@@ -1013,31 +1032,26 @@
         if (draggedLink) {
             draggedLink.classList.remove('dragging');
             qsa('.link-wrap.drag-over-link').forEach(function (w) { w.classList.remove('drag-over-link'); });
-
             var linksList = draggedLink.closest('.group-links');
             if (linksList) {
                 var groupId = parseInt(linksList.dataset.groupId);
                 var order = qsa('.link-wrap', linksList).map(function (w) {
                     return parseInt(w.dataset.linkId);
                 }).filter(function (id) { return !isNaN(id); });
-
                 api('POST', '/api/links/reorder', { group_id: groupId, order: order })
                     .catch(function (err) { console.error('Erreur reorder liens:', err); });
             }
             draggedLink = null;
         }
     });
-
     /* ══════════════════════════════════════
        DELEGATION D'EVENEMENTS (data-action)
        ══════════════════════════════════════ */
-
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('[data-action]');
         if (!btn) return;
         var action = btn.dataset.action;
         var id = btn.dataset.id ? parseInt(btn.dataset.id) : null;
-
         switch (action) {
             case 'new-group':
                 pendingPosition = null;
@@ -1050,13 +1064,13 @@
                 if (confirm('Supprimer le groupe \u00AB ' + (btn.dataset.name || '') + ' \u00BB et tous ses liens ?')) {
                     api('DELETE', '/api/groups/' + id)
                         .then(function () { location.href = editUrl(); })
-                        .catch(function (err) { alert(err.message); });
+                        .catch(function (err) { showToast(err.message, 'error'); });
                 }
                 break;
             case 'unplace-group':
                 api('POST', '/api/groups/' + id + '/move', { grid_row: -1, grid_col: 0 })
                     .then(function () { location.href = editUrl(); })
-                    .catch(function (err) { alert(err.message); });
+                    .catch(function (err) { showToast(err.message, 'error'); });
                 break;
             case 'new-link':
                 openLinkModal(null, parseInt(btn.dataset.groupId));
@@ -1068,7 +1082,7 @@
                 if (confirm('Supprimer le lien \u00AB ' + (btn.dataset.name || '') + ' \u00BB ?')) {
                     api('DELETE', '/api/links/' + id)
                         .then(function () { location.href = editUrl(); })
-                        .catch(function (err) { alert(err.message); });
+                        .catch(function (err) { showToast(err.message, 'error'); });
                 }
                 break;
             case 'new-grid-widget':
@@ -1081,7 +1095,7 @@
                 if (confirm('Supprimer ce widget ?')) {
                     api('DELETE', '/api/grid-widgets/' + id)
                         .then(function () { location.href = editUrl(); })
-                        .catch(function (err) { alert(err.message); });
+                        .catch(function (err) { showToast(err.message, 'error'); });
                 }
                 break;
             case 'open-settings':
@@ -1098,7 +1112,7 @@
                 if (confirm('Supprimer cette page et tous ses groupes ?')) {
                     api('DELETE', '/api/pages/' + id)
                         .then(function () { location.href = editUrl(); })
-                        .catch(function (err) { alert(err.message); });
+                        .catch(function (err) { showToast(err.message, 'error'); });
                 }
                 break;
             case 'new-service':
@@ -1113,16 +1127,14 @@
                 if (confirm('Supprimer ce service ?')) {
                     api('DELETE', '/api/services/' + id)
                         .then(function () { location.href = editUrl(); })
-                        .catch(function (err) { alert(err.message); });
+                        .catch(function (err) { showToast(err.message, 'error'); });
                 }
                 break;
         }
     });
-
     /* ══════════════════════════════════════
        INITIALISATION
        ══════════════════════════════════════ */
-
     buildOccupiedMap();
     initModals();
     initExtraModals();
@@ -1161,7 +1173,6 @@
     }
     loadGridWidgetCalendars();
     setInterval(loadGridWidgetCalendars, 300000);
-
     // ── Grid Widget service live updates ──
     function loadGridWidgetServices() {
         qsa('.gw-service').forEach(function(el) {
@@ -1169,7 +1180,6 @@
             if (!sid) return;
             var statusEl = el.querySelector('.gw-service-status');
             var dataEl = el.querySelector('.gw-service-data');
-
             fetch('/api/services/' + sid + '/proxy')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
@@ -1198,7 +1208,6 @@
         });
     }
     loadGridWidgetServices();
-
     // ── Grid Widget camera refresh ──
     function refreshGridWidgetCameras() {
         qsa('.gw-camera-img').forEach(function(img) {
@@ -1207,36 +1216,29 @@
             img.src = img.dataset.baseSrc + '?t=' + Date.now();
         });
     }
-
     // ── Dynamic refresh interval ──
     var refreshMs = parseInt(PAGE_DATA.settings.refresh_interval || '30') * 1000;
     if (refreshMs > 0) {
         setInterval(loadGridWidgetServices, refreshMs);
         setInterval(refreshGridWidgetCameras, refreshMs);
     }
-
     /* ══════════════════════════════════════
        GESTION DES PROFILS
        ══════════════════════════════════════ */
-
     function initProfiles() {
         var profileSelector = qs('.header-profile');
         if (!profileSelector) return;
-
         var profileBtn = qs('.header-profile-btn', profileSelector);
         var profileDropdown = qs('.profile-dropdown', profileSelector);
-
         // Toggle dropdown
         profileBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             profileDropdown.classList.toggle('hidden');
         });
-
         // Close dropdown when clicking outside
         document.addEventListener('click', function () {
             profileDropdown.classList.add('hidden');
         });
-
         // Profile switching
         qsa('.profile-item[data-profile-id]', profileDropdown).forEach(function (item) {
             item.addEventListener('click', function () {
@@ -1246,11 +1248,10 @@
                         window.location.reload();
                     })
                     .catch(function (e) {
-                        alert('Erreur changement profil: ' + e.message);
+                        showToast('Erreur changement profil: ' + e.message, 'error');
                     });
             });
         });
-
         // Add profile button
         var addBtn = qs('.profile-add', profileDropdown);
         if (addBtn) {
@@ -1259,17 +1260,15 @@
                 if (!name) return;
                 var icon = prompt('Icône (emoji):', '👤');
                 if (!icon) return;
-
                 api('POST', '/api/profiles', { name: name, icon: icon })
                     .then(function () {
                         window.location.reload();
                     })
                     .catch(function (e) {
-                        alert('Erreur création profil: ' + e.message);
+                        showToast('Erreur création profil: ' + e.message, 'error');
                     });
             });
         }
-
         // Manage profiles button
         var manageBtn = qs('.profile-manage', profileDropdown);
         if (manageBtn) {
@@ -1279,7 +1278,6 @@
             });
         }
     }
-
     function openProfileManager() {
         var profiles = PAGE_DATA.profiles || [];
         var html = '<div style="max-height:60vh;overflow:auto">';
@@ -1297,11 +1295,9 @@
             html += '</div>';
         });
         html += '</div>';
-
         var modalId = 'profileManagerModal';
         var existing = qs('#' + modalId);
         if (existing) existing.remove();
-
         var wrapper = document.createElement('div');
         wrapper.innerHTML = '<div class="modal fade" id="' + modalId + '" tabindex="-1">' +
             '<div class="modal-dialog"><div class="modal-content">' +
@@ -1310,10 +1306,8 @@
             '<div class="modal-body">' + html + '</div>' +
             '</div></div></div>';
         document.body.appendChild(wrapper.firstChild);
-
         var modalEl = qs('#' + modalId);
         var bsModal = new bootstrap.Modal(modalEl);
-
         qsa('.pm-rename', modalEl).forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var pid = parseInt(this.dataset.id);
@@ -1323,10 +1317,9 @@
                 if (!newIcon) return;
                 api('PUT', '/api/profiles/' + pid, { name: newName, icon: newIcon })
                     .then(function () { window.location.reload(); })
-                    .catch(function (e) { alert('Erreur: ' + e.message); });
+                    .catch(function (e) { showToast('Erreur: ' + e.message, 'error'); });
             });
         });
-
         qsa('.pm-delete', modalEl).forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var pid = parseInt(this.dataset.id);
@@ -1334,19 +1327,15 @@
                 if (!confirm('Supprimer le profil "' + pname + '" et toutes ses données ?')) return;
                 api('DELETE', '/api/profiles/' + pid)
                     .then(function () { window.location.reload(); })
-                    .catch(function (e) { alert('Erreur: ' + e.message); });
+                    .catch(function (e) { showToast('Erreur: ' + e.message, 'error'); });
             });
         });
-
         bsModal.show();
     }
-
     /* ══════════════════════════════════════
        INITIALISATION
        ══════════════════════════════════════ */
-
     initProfiles();
-
     if (PAGE_DATA.editOnLoad) {
         setEditMode(true);
     } else {
@@ -1354,5 +1343,4 @@
             if (sessionStorage.getItem('fh_edit') === '1') setEditMode(true);
         } catch (e) {}
     }
-
 })();

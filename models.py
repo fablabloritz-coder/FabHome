@@ -229,7 +229,6 @@ def init_db():
         'title': "Ma Page d'Accueil",
         'theme': 'dark',
         'background_url': '',
-        'greeting_name': '',
         'search_provider': 'google',
         'grid_cols': '4',
         'grid_rows': '3',
@@ -237,17 +236,17 @@ def init_db():
         'caldav_username': '',
         'caldav_password': '',
         'camera_urls': '',
+        'refresh_interval': '30',
     }.items():
         conn.execute('INSERT OR IGNORE INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
 
     for wtype, cfg, en, order in [
-        ('greeting', '{}', 1, 0),
-        ('search',   '{"provider":"google"}', 1, 1),
-        ('clock',    '{}', 1, 2),
-        ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 3),
-        ('health',   '{}', 0, 4),
-        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 0, 5),
-        ('camera',   '{"streams":[]}', 0, 6),
+        ('search',   '{"provider":"google"}', 1, 0),
+        ('clock',    '{}', 1, 1),
+        ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 2),
+        ('health',   '{}', 0, 3),
+        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 0, 4),
+        ('camera',   '{"streams":[]}', 0, 5),
     ]:
         conn.execute(
             'INSERT OR IGNORE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (1,?,?,?,?)',
@@ -287,7 +286,6 @@ def create_profile(name, icon='👤', color='#6c757d'):
         'title': "Ma Page d'Accueil",
         'theme': 'dark',
         'background_url': '',
-        'greeting_name': name,
         'search_provider': 'google',
         'grid_cols': '4',
         'grid_rows': '3',
@@ -306,13 +304,12 @@ def create_profile(name, icon='👤', color='#6c757d'):
     
     # Créer les widgets par défaut
     for wtype, cfg, en, order in [
-        ('greeting', '{}', 0, 0),
-        ('search',   '{"provider":"google"}', 1, 1),
-        ('clock',    '{}', 1, 2),
-        ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 3),
-        ('health',   '{}', 0, 4),
-        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 1, 5),
-        ('camera',   '{"streams":[]}', 0, 6),
+        ('search',   '{"provider":"google"}', 1, 0),
+        ('clock',    '{}', 1, 1),
+        ('weather',  '{"latitude":48.69,"longitude":6.18,"city":"Nancy"}', 0, 2),
+        ('health',   '{}', 0, 3),
+        ('calendar', '{"nextcloud_url":"","username":"","password":""}', 1, 4),
+        ('camera',   '{"streams":[]}', 0, 5),
     ]:
         conn.execute(
             'INSERT OR IGNORE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
@@ -418,6 +415,13 @@ def reorder_pages(ordered_ids):
 
 
 # ── Groupes ───────────────────────────────────────────────
+
+def get_group(gid):
+    conn = get_db()
+    row = conn.execute('SELECT * FROM groups_ WHERE id=?', (gid,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 
 def get_groups(page_id=None):
     conn = get_db()
@@ -629,6 +633,18 @@ def get_grid_widgets(page_id=1):
     return rows
 
 
+def get_grid_widget(wid):
+    """Récupère un widget de grille par son ID"""
+    conn = get_db()
+    row = conn.execute('SELECT * FROM group_widgets WHERE id=?', (wid,)).fetchone()
+    conn.close()
+    if row:
+        r = dict(row)
+        r['config'] = json.loads(r['config'])
+        return r
+    return None
+
+
 def create_grid_widget(page_id, wtype, config=None, icon_size='medium', text_size='medium',
                        col_span=1, row_span=1, grid_col=0, grid_row=-1):
     """Crée un widget autonome sur la grille"""
@@ -697,6 +713,7 @@ def delete_grid_widget(wid):
 def export_all():
     conn = get_db()
     data = {
+        'profiles': [dict(r) for r in conn.execute('SELECT * FROM profiles ORDER BY id').fetchall()],
         'settings': {r['key']: r['value'] for r in
                      conn.execute('SELECT key, value FROM settings').fetchall()},
         'pages': [dict(r) for r in conn.execute('SELECT * FROM pages ORDER BY sort_order').fetchall()],
@@ -724,59 +741,75 @@ def export_all():
 
 def import_all(data):
     conn = get_db()
-    conn.execute('DELETE FROM links')
-    conn.execute('DELETE FROM groups_')
-    conn.execute('DELETE FROM group_widgets')
-    conn.execute('DELETE FROM pages')
-    conn.execute('DELETE FROM services')
-    conn.execute('DELETE FROM settings')
-    conn.execute('DELETE FROM widgets')
+    try:
+        conn.execute('BEGIN')
+        conn.execute('DELETE FROM links')
+        conn.execute('DELETE FROM groups_')
+        conn.execute('DELETE FROM group_widgets')
+        conn.execute('DELETE FROM pages')
+        conn.execute('DELETE FROM services')
+        conn.execute('DELETE FROM settings')
+        conn.execute('DELETE FROM widgets')
+        conn.execute('DELETE FROM profiles')
 
-    for k, v in data.get('settings', {}).items():
-        conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
+        # Profils
+        for p in data.get('profiles', []):
+            conn.execute(
+                'INSERT INTO profiles (id, name, icon, color) VALUES (?,?,?,?)',
+                (p['id'], p.get('name', 'Profil'), p.get('icon', '👤'), p.get('color', '#6c757d')))
+        # Garantir au moins le profil 1
+        if not conn.execute('SELECT 1 FROM profiles WHERE id=1').fetchone():
+            conn.execute("INSERT INTO profiles (id, name, icon, color) VALUES (1, 'Principal', '👤', '#0d6efd')")
 
-    for p in data.get('pages', []):
-        conn.execute('INSERT INTO pages (id, profile_id, name, icon, sort_order) VALUES (?,?,?,?,?)',
-                     (p['id'], p.get('profile_id', 1), p['name'], p.get('icon', 'bi-house'), p.get('sort_order', 0)))
+        for k, v in data.get('settings', {}).items():
+            conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
 
-    for g in data.get('groups', []):
-        conn.execute(
-            'INSERT INTO groups_ (id, page_id, name, icon, col_span, row_span, grid_col, grid_row, sort_order) '
-            'VALUES (?,?,?,?,?,?,?,?,?)',
-            (g['id'], g.get('page_id', 1), g['name'], g['icon'],
-             g.get('col_span', 1), g.get('row_span', 1),
-             g.get('grid_col', 0), g.get('grid_row', -1), g.get('sort_order', 0)))
+        for p in data.get('pages', []):
+            conn.execute('INSERT INTO pages (id, profile_id, name, icon, sort_order) VALUES (?,?,?,?,?)',
+                         (p['id'], p.get('profile_id', 1), p['name'], p.get('icon', 'bi-house'), p.get('sort_order', 0)))
 
-    for lnk in data.get('links', []):
-        conn.execute(
-            'INSERT INTO links (id, group_id, name, url, icon, description, sort_order, check_status) '
-            'VALUES (?,?,?,?,?,?,?,?)',
-            (lnk['id'], lnk['group_id'], lnk['name'], lnk['url'],
-             lnk.get('icon', 'bi-link-45deg'), lnk.get('description', ''),
-             lnk.get('sort_order', 0), lnk.get('check_status', 0)))
+        for g in data.get('groups', []):
+            conn.execute(
+                'INSERT INTO groups_ (id, page_id, name, icon, col_span, row_span, grid_col, grid_row, sort_order) '
+                'VALUES (?,?,?,?,?,?,?,?,?)',
+                (g['id'], g.get('page_id', 1), g['name'], g['icon'],
+                 g.get('col_span', 1), g.get('row_span', 1),
+                 g.get('grid_col', 0), g.get('grid_row', -1), g.get('sort_order', 0)))
 
-    for w in data.get('widgets', []):
-        conn.execute(
-            'INSERT OR REPLACE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
-            (w.get('profile_id', 1), w['type'], json.dumps(w.get('config', {})),
-             w.get('enabled', 1), w.get('sort_order', 0)))
+        for lnk in data.get('links', []):
+            conn.execute(
+                'INSERT INTO links (id, group_id, name, url, icon, description, sort_order, check_status) '
+                'VALUES (?,?,?,?,?,?,?,?)',
+                (lnk['id'], lnk['group_id'], lnk['name'], lnk['url'],
+                 lnk.get('icon', 'bi-link-45deg'), lnk.get('description', ''),
+                 lnk.get('sort_order', 0), lnk.get('check_status', 0)))
 
-    for s in data.get('services', []):
-        conn.execute(
-            'INSERT INTO services (name, type, url, api_key, config, enabled, sort_order) '
-            'VALUES (?,?,?,?,?,?,?)',
-            (s['name'], s['type'], s.get('url', ''),
-             s.get('api_key', ''), json.dumps(s.get('config', {})),
-             s.get('enabled', 1), s.get('sort_order', 0)))
+        for w in data.get('widgets', []):
+            conn.execute(
+                'INSERT OR REPLACE INTO widgets (profile_id, type, config, enabled, sort_order) VALUES (?,?,?,?,?)',
+                (w.get('profile_id', 1), w['type'], json.dumps(w.get('config', {})),
+                 w.get('enabled', 1), w.get('sort_order', 0)))
 
-    for gw in data.get('grid_widgets', []):
-        conn.execute(
-            'INSERT INTO group_widgets (page_id, type, config, grid_col, grid_row, col_span, row_span, icon_size, text_size) '
-            'VALUES (?,?,?,?,?,?,?,?,?)',
-            (gw.get('page_id', 1), gw['type'], json.dumps(gw.get('config', {})),
-             gw.get('grid_col', 0), gw.get('grid_row', 0),
-             gw.get('col_span', 1), gw.get('row_span', 1),
-             gw.get('icon_size', 'medium'), gw.get('text_size', 'medium')))
+        for s in data.get('services', []):
+            conn.execute(
+                'INSERT INTO services (name, type, url, api_key, config, enabled, sort_order) '
+                'VALUES (?,?,?,?,?,?,?)',
+                (s['name'], s['type'], s.get('url', ''),
+                 s.get('api_key', ''), json.dumps(s.get('config', {})),
+                 s.get('enabled', 1), s.get('sort_order', 0)))
 
-    conn.commit()
-    conn.close()
+        for gw in data.get('grid_widgets', []):
+            conn.execute(
+                'INSERT INTO group_widgets (page_id, type, config, grid_col, grid_row, col_span, row_span, icon_size, text_size) '
+                'VALUES (?,?,?,?,?,?,?,?,?)',
+                (gw.get('page_id', 1), gw['type'], json.dumps(gw.get('config', {})),
+                 gw.get('grid_col', 0), gw.get('grid_row', 0),
+                 gw.get('col_span', 1), gw.get('row_span', 1),
+                 gw.get('icon_size', 'medium'), gw.get('text_size', 'medium')))
+
+        conn.execute('COMMIT')
+    except Exception:
+        conn.execute('ROLLBACK')
+        raise
+    finally:
+        conn.close()

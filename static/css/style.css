@@ -103,6 +103,21 @@
     --fh-accent-glow: rgba(255,127,80,0.35);
 }
 
+/* ── Thème Personnalisé ───────────────── */
+[data-fh-theme="custom"] {
+    --fh-bg: var(--fh-custom-bg, #0f0f1a);
+    --fh-bg-gradient: linear-gradient(135deg, var(--fh-custom-bg, #0f0f1a) 0%, var(--fh-custom-card-bg, #1a1a2e) 100%);
+    --fh-card-bg: var(--fh-custom-card-bg, rgba(255,255,255,0.05));
+    --fh-card-border: rgba(255,255,255,0.08);
+    --fh-text: var(--fh-custom-text, #e0e0e0);
+    --fh-text-muted: var(--fh-custom-text, #888);
+    --fh-search-bg: var(--fh-custom-card-bg, rgba(255,255,255,0.08));
+    --fh-edit-outline: rgba(100,160,255,0.35);
+    --fh-edit-handle: rgba(255,255,255,0.15);
+    --fh-accent: var(--fh-custom-accent, #ff6b35);
+    --fh-accent-glow: rgba(255,107,53,0.35);
+}
+
 /* ── Base ─────────────────────────────── */
 * { box-sizing: border-box; }
 body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding-top: 70px; }

@@ -654,7 +654,32 @@
                                     <option value="ocean" {% if settings.get('theme')=='ocean' %}selected{% endif %}>🌊 Océan</option>
                                     <option value="forest" {% if settings.get('theme')=='forest' %}selected{% endif %}>🌲 Forêt</option>
                                     <option value="sunset" {% if settings.get('theme')=='sunset' %}selected{% endif %}>🌅 Coucher de soleil</option>
+                                    <option value="custom" {% if settings.get('theme')=='custom' %}selected{% endif %}>🎨 Personnalisé</option>
                                 </select>
+                            </div>
+                            <div id="customThemeOptions" class="mb-3" style="display:{% if settings.get('theme')=='custom' %}block{% else %}none{% endif %}">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="form-label small">Couleur d'accent</label>
+                                        <input type="color" class="form-control form-control-color w-100" name="custom_accent"
+                                               value="{{ settings.get('custom_accent', '#ff6b35') }}">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Fond</label>
+                                        <input type="color" class="form-control form-control-color w-100" name="custom_bg"
+                                               value="{{ settings.get('custom_bg', '#0f0f1a') }}">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Carte</label>
+                                        <input type="color" class="form-control form-control-color w-100" name="custom_card_bg"
+                                               value="{{ settings.get('custom_card_bg', '#1a1a2e') }}">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Texte</label>
+                                        <input type="color" class="form-control form-control-color w-100" name="custom_text"
+                                               value="{{ settings.get('custom_text', '#e0e0e0') }}">
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Image de fond</label>

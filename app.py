@@ -53,6 +53,36 @@ def set_current_profile_id(profile_id):
     session['profile_id'] = profile_id
 
 
+def _check_grid_collision(page_id, grid_row, grid_col, col_span, row_span,
+                           exclude_group_id=None, exclude_widget_id=None):
+    """Vérifie si un emplacement grille est libre. Renvoie True si collision."""
+    if grid_row < 0:
+        return False
+    groups = models.get_groups(page_id=page_id)
+    widgets = models.get_grid_widgets(page_id)
+    for g in groups:
+        if exclude_group_id and g['id'] == exclude_group_id:
+            continue
+        if g.get('grid_row', -1) < 0:
+            continue
+        gr, gc = g['grid_row'], g['grid_col']
+        gs, rs = g.get('col_span', 1), g.get('row_span', 1)
+        if (grid_col < gc + gs and grid_col + col_span > gc and
+                grid_row < gr + rs and grid_row + row_span > gr):
+            return True
+    for w in widgets:
+        if exclude_widget_id and w['id'] == exclude_widget_id:
+            continue
+        if w.get('grid_row', -1) < 0:
+            continue
+        wr, wc = w['grid_row'], w['grid_col']
+        ws, wrs = w.get('col_span', 1), w.get('row_span', 1)
+        if (grid_col < wc + ws and grid_col + col_span > wc and
+                grid_row < wr + wrs and grid_row + row_span > wr):
+            return True
+    return False
+
+
 # ── Pages ─────────────────────────────────────────────────
 
 @app.route('/')
@@ -175,10 +205,11 @@ def api_update_settings():
         if not data:
             return jsonify(error='Données manquantes'), 400
         profile_id = get_current_profile_id()
-        allowed = {'title', 'theme', 'background_url', 'greeting_name',
+        allowed = {'title', 'theme', 'background_url',
                    'search_provider', 'grid_cols', 'grid_rows',
                    'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls',
-                   'refresh_interval'}
+                   'refresh_interval',
+                   'custom_accent', 'custom_bg', 'custom_card_bg', 'custom_text'}
         for k, v in data.items():
             if k in allowed:
                 models.update_setting(k, str(v)[:500], profile_id)
@@ -238,7 +269,16 @@ def api_move_group(gid):
     data = request.get_json() or {}
     if 'grid_row' not in data or 'grid_col' not in data:
         return jsonify(error='grid_row et grid_col requis'), 400
-    models.move_group(gid, int(data['grid_row']), int(data['grid_col']))
+    grid_row = int(data['grid_row'])
+    grid_col = int(data['grid_col'])
+    if grid_row >= 0:
+        g = models.get_group(gid)
+        page_id = g['page_id'] if g else 1
+        cs = g.get('col_span', 1) if g else 1
+        rs = g.get('row_span', 1) if g else 1
+        if _check_grid_collision(page_id, grid_row, grid_col, cs, rs, exclude_group_id=gid):
+            return jsonify(error='Collision détectée sur la grille'), 409
+    models.move_group(gid, grid_row, grid_col)
     return jsonify(ok=True)
 
 
@@ -324,16 +364,22 @@ def api_create_grid_widget():
             return jsonify(error=f'Type invalide. Types autorisés: {", ".join(allowed_types)}'), 400
         
         page_id = data.get('page_id', 1)
+        grid_col = int(data.get('grid_col', 0))
+        grid_row = int(data.get('grid_row', -1))
+        col_span = int(data.get('col_span', 1))
+        row_span = int(data.get('row_span', 1))
+        if grid_row >= 0 and _check_grid_collision(int(page_id), grid_row, grid_col, col_span, row_span):
+            return jsonify(error='Collision détectée sur la grille'), 409
         wid = models.create_grid_widget(
             page_id=int(page_id),
             wtype=wtype,
             config=data.get('config', {}),
             icon_size=data.get('icon_size', 'medium'),
             text_size=data.get('text_size', 'medium'),
-            col_span=int(data.get('col_span', 1)),
-            row_span=int(data.get('row_span', 1)),
-            grid_col=int(data.get('grid_col', 0)),
-            grid_row=int(data.get('grid_row', -1)))
+            col_span=col_span,
+            row_span=row_span,
+            grid_col=grid_col,
+            grid_row=grid_row)
         return jsonify(id=wid), 201
     except Exception as e:
         logger.error(f"Erreur création widget grille: {e}")
@@ -366,7 +412,16 @@ def api_move_grid_widget(wid):
         data = request.get_json() or {}
         if 'grid_row' not in data or 'grid_col' not in data:
             return jsonify(error='grid_row et grid_col requis'), 400
-        models.move_grid_widget(wid, int(data['grid_row']), int(data['grid_col']))
+        grid_row = int(data['grid_row'])
+        grid_col = int(data['grid_col'])
+        if grid_row >= 0:
+            w = models.get_grid_widget(wid)
+            if w:
+                cs = w.get('col_span', 1)
+                rs = w.get('row_span', 1)
+                if _check_grid_collision(w['page_id'], grid_row, grid_col, cs, rs, exclude_widget_id=wid):
+                    return jsonify(error='Collision détectée sur la grille'), 409
+        models.move_grid_widget(wid, grid_row, grid_col)
         return jsonify(ok=True)
     except Exception as e:
         logger.error(f"Erreur déplacement widget: {e}")
@@ -392,7 +447,7 @@ def api_update_widgets():
     if not data:
         return jsonify(error='Données manquantes'), 400
     profile_id = get_current_profile_id()
-    allowed = {'greeting', 'search', 'clock', 'weather', 'health', 'calendar', 'camera'}
+    allowed = {'search', 'clock', 'weather', 'health', 'calendar', 'camera'}
     for wtype, wdata in data.items():
         if wtype in allowed and isinstance(wdata, dict):
             models.update_widget(wtype,
@@ -566,6 +621,134 @@ def api_service_proxy(sid):
                 logger.warning(f"Fabtrack proxy errors: {'; '.join(errors)}")
             return jsonify(result)
 
+        # ── Docker : containers via API
+        if svc_type == 'docker':
+            result = {'type': 'docker'}
+            try:
+                containers = _fetch_json(svc_url + '/containers/json?all=true')
+                result['total'] = len(containers)
+                result['running'] = len([c for c in containers if c.get('State') == 'running'])
+                result['stopped'] = result['total'] - result['running']
+                result['containers'] = [
+                    {'name': (c.get('Names') or ['/??'])[0].lstrip('/'),
+                     'state': c.get('State', ''),
+                     'status': c.get('Status', '')}
+                    for c in containers[:10]
+                ]
+            except Exception as e:
+                result['error'] = f'Docker API: {e}'
+            return jsonify(result)
+
+        # ── Portainer : environments + containers
+        if svc_type == 'portainer':
+            result = {'type': 'portainer'}
+            try:
+                headers['Authorization'] = 'Bearer ' + (svc.get('api_key') or '')
+                endpoints = _fetch_json(svc_url + '/api/endpoints')
+                result['endpoints'] = len(endpoints)
+                total_c = 0
+                running_c = 0
+                for ep in endpoints[:5]:
+                    try:
+                        snap = ep.get('Snapshots', [{}])[0]
+                        total_c += snap.get('DockerSnapshotRaw', {}).get('Containers', snap.get('TotalCPU', 0))
+                        running_c += snap.get('RunningContainerCount', 0)
+                    except Exception:
+                        pass
+                result['containers_total'] = total_c
+                result['containers_running'] = running_c
+            except Exception as e:
+                result['error'] = f'Portainer API: {e}'
+            return jsonify(result)
+
+        # ── Proxmox : nodes + VMs
+        if svc_type == 'proxmox':
+            result = {'type': 'proxmox'}
+            try:
+                headers['Authorization'] = 'PVEAPIToken=' + (svc.get('api_key') or '')
+                nodes_data = _fetch_json(svc_url + '/api2/json/nodes')
+                nodes = nodes_data.get('data', [])
+                result['nodes'] = len(nodes)
+                result['node_list'] = [
+                    {'name': n.get('node', ''), 'status': n.get('status', ''),
+                     'cpu': round(n.get('cpu', 0) * 100, 1)}
+                    for n in nodes[:5]
+                ]
+            except Exception as e:
+                result['error'] = f'Proxmox API: {e}'
+            return jsonify(result)
+
+        # ── Plex : bibliothèques + sessions
+        if svc_type == 'plex':
+            result = {'type': 'plex'}
+            try:
+                headers['X-Plex-Token'] = svc.get('api_key') or ''
+                headers['Accept'] = 'application/json'
+                libs = _fetch_json(svc_url + '/library/sections')
+                sections = libs.get('MediaContainer', {}).get('Directory', [])
+                result['libraries'] = len(sections)
+                result['library_list'] = [
+                    {'title': s.get('title', ''), 'type': s.get('type', '')}
+                    for s in sections[:8]
+                ]
+                try:
+                    sess = _fetch_json(svc_url + '/status/sessions')
+                    result['active_streams'] = sess.get('MediaContainer', {}).get('size', 0)
+                except Exception:
+                    result['active_streams'] = 0
+            except Exception as e:
+                result['error'] = f'Plex API: {e}'
+            return jsonify(result)
+
+        # ── Radarr : films
+        if svc_type == 'radarr':
+            result = {'type': 'radarr'}
+            try:
+                movies = _fetch_json(svc_url + '/api/v3/movie')
+                result['total'] = len(movies)
+                result['monitored'] = len([m for m in movies if m.get('monitored')])
+                result['has_file'] = len([m for m in movies if m.get('hasFile')])
+                result['missing'] = result['monitored'] - result['has_file']
+            except Exception as e:
+                result['error'] = f'Radarr API: {e}'
+            return jsonify(result)
+
+        # ── Sonarr : séries
+        if svc_type == 'sonarr':
+            result = {'type': 'sonarr'}
+            try:
+                series = _fetch_json(svc_url + '/api/v3/series')
+                result['total'] = len(series)
+                result['monitored'] = len([s for s in series if s.get('monitored')])
+                total_eps = sum(s.get('statistics', {}).get('totalEpisodeCount', 0) for s in series)
+                have_eps = sum(s.get('statistics', {}).get('episodeFileCount', 0) for s in series)
+                result['episodes_total'] = total_eps
+                result['episodes_have'] = have_eps
+            except Exception as e:
+                result['error'] = f'Sonarr API: {e}'
+            return jsonify(result)
+
+        # ── TrueNAS : pools + alertes
+        if svc_type == 'truenas':
+            result = {'type': 'truenas'}
+            try:
+                headers['Authorization'] = 'Bearer ' + (svc.get('api_key') or '')
+                pools = _fetch_json(svc_url + '/api/v2.0/pool')
+                result['pools'] = len(pools)
+                result['pool_list'] = [
+                    {'name': p.get('name', ''), 'status': p.get('status', ''),
+                     'healthy': p.get('healthy', False)}
+                    for p in pools[:5]
+                ]
+                try:
+                    alerts = _fetch_json(svc_url + '/api/v2.0/alert/list')
+                    result['alerts'] = len(alerts)
+                except Exception:
+                    result['alerts'] = 0
+            except Exception as e:
+                result['error'] = f'TrueNAS API: {e}'
+            return jsonify(result)
+
         # ── Générique / autres types
         endpoint = svc.get('config', {}).get('endpoint', '')
         target = svc_url + endpoint
@@ -627,7 +810,11 @@ def api_import_config():
         return jsonify(error='JSON invalide'), 400
     if 'settings' not in data and 'groups' not in data:
         return jsonify(error='Données de configuration requises'), 400
-    models.import_all(data)
+    try:
+        models.import_all(data)
+    except Exception as e:
+        logger.error(f"Erreur import config: {e}")
+        return jsonify(error=f'Import échoué (rollback effectué): {e}'), 500
     return jsonify(ok=True)
 
 
