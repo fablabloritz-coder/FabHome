@@ -1245,7 +1245,7 @@
                 var profileId = this.getAttribute('data-profile-id');
                 api('POST', '/api/profiles/switch', { profile_id: parseInt(profileId) })
                     .then(function () {
-                        window.location.reload();
+                        window.location.href = '/';
                     })
                     .catch(function (e) {
                         showToast('Erreur changement profil: ' + e.message, 'error');

@@ -92,6 +92,10 @@ def index():
     pages = models.get_pages(profile_id)
     default_page = pages[0]['id'] if pages else 1
     page_id = request.args.get('page', default_page, type=int)
+    # Valider que la page appartient au profil courant
+    valid_page_ids = {p['id'] for p in pages}
+    if page_id not in valid_page_ids:
+        page_id = default_page
     groups = models.get_groups(page_id=page_id)
     widgets = {w['type']: w for w in models.get_widgets(profile_id)}
 
@@ -227,6 +231,11 @@ def api_create_group():
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Nom requis'), 400
+    page_id = int(data.get('page_id', 1))
+    profile_id = get_current_profile_id()
+    valid_page_ids = {p['id'] for p in models.get_pages(profile_id)}
+    if page_id not in valid_page_ids:
+        return jsonify(error='Page invalide pour ce profil'), 403
     gid = models.create_group(
         name[:100],
         (data.get('icon') or 'bi-folder')[:500],
@@ -234,7 +243,7 @@ def api_create_group():
         int(data.get('row_span', 1)),
         int(data.get('grid_row', -1)),
         int(data.get('grid_col', 0)),
-        page_id=int(data.get('page_id', 1)),
+        page_id=page_id,
         icon_size=(data.get('icon_size') or 'medium')[:10],
         text_size=(data.get('text_size') or 'medium')[:10])
     return jsonify(id=gid), 201
@@ -363,7 +372,11 @@ def api_create_grid_widget():
         if wtype not in allowed_types:
             return jsonify(error=f'Type invalide. Types autorisés: {", ".join(allowed_types)}'), 400
         
-        page_id = data.get('page_id', 1)
+        page_id = int(data.get('page_id', 1))
+        profile_id = get_current_profile_id()
+        valid_page_ids = {p['id'] for p in models.get_pages(profile_id)}
+        if page_id not in valid_page_ids:
+            return jsonify(error='Page invalide pour ce profil'), 403
         grid_col = int(data.get('grid_col', 0))
         grid_row = int(data.get('grid_row', -1))
         col_span = int(data.get('col_span', 1))
