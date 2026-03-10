@@ -649,11 +649,10 @@ button.page-tab { border: 1px dashed var(--fh-card-border); }
     padding: 1rem 1.25rem;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: box-shadow 0.15s;
     overflow: auto;
 }
 .group-card:hover {
-    transform: translateY(-2px);
     box-shadow: 0 8px 30px rgba(0,0,0,0.12);
 }
 
@@ -958,10 +957,9 @@ body.edit-mode .group-card {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     overflow: auto;
-    transition: transform 0.18s, box-shadow 0.2s;
+    transition: box-shadow 0.2s;
 }
 .grid-widget-card:hover {
-    transform: translateY(-2px);
     box-shadow: 0 8px 24px rgba(0,0,0,0.15);
 }
 .grid-widget-card.size-icon-small i { font-size: 1rem; }
