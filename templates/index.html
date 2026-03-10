@@ -970,18 +970,25 @@
                         <label class="form-label">Type</label>
                         <select class="form-select" name="type">
                             <option value="generic">Générique (JSON)</option>
-                            <option value="pretgo">PrêtGo</option>
-                            <option value="fabtrack">Fabtrack</option>
+                            <optgroup label="Impression 3D">
+                            <option value="repetier">Repetier-Server</option>
+                            </optgroup>
+                            <optgroup label="Infrastructure">
                             <option value="docker">Docker</option>
                             <option value="portainer">Portainer</option>
                             <option value="proxmox">Proxmox</option>
+                            <option value="truenas">TrueNAS</option>
+                            <option value="uptimekuma">Uptime Kuma</option>
+                            </optgroup>
+                            <optgroup label="Réseau">
                             <option value="pihole">Pi-hole</option>
                             <option value="adguard">AdGuard Home</option>
+                            </optgroup>
+                            <optgroup label="Médias">
                             <option value="plex">Plex</option>
                             <option value="radarr">Radarr</option>
                             <option value="sonarr">Sonarr</option>
-                            <option value="truenas">TrueNAS</option>
-                            <option value="uptimekuma">Uptime Kuma</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div class="mb-3">

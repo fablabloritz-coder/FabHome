@@ -759,60 +759,49 @@
             el.innerHTML = html;
             return;
         }
-        if (stype === 'pretgo') {
-            var mat = data.total_materiel;
-            var pers = data.total_personnes;
-            html += '<div class="svc-app-block">';
-            if (mat !== null && mat !== undefined) {
-                html += '<div class="svc-stat"><i class="bi bi-box-seam"></i> <strong>' + mat + '</strong> matériels</div>';
-                if (data.etats) {
-                    var etats = data.etats;
-                    var eKeys = Object.keys(etats);
-                    html += '<div class="svc-etats">';
-                    eKeys.forEach(function(k) { html += '<span class="svc-badge">' + escHtml(k) + ' : ' + etats[k] + '</span> '; });
-                    html += '</div>';
-                }
-            }
-            if (pers !== null && pers !== undefined) {
-                html += '<div class="svc-stat"><i class="bi bi-people"></i> <strong>' + pers + '</strong> personnes</div>';
-            }
-            if (mat === null && pers === null) {
-                html += '<div class="svc-stat text-muted"><i class="bi bi-info-circle"></i> Aucune donnée disponible</div>';
-            }
+        if (stype === 'repetier') {
+            html = '<div class="svc-app-block">';
+            html += '<div class="svc-stat"><i class="bi bi-printer"></i> <strong>' + (data.total || 0) + '</strong> imprimante(s)';
+            if (data.online !== undefined) html += ' — <span class="text-success">' + data.online + ' en ligne</span>';
             html += '</div>';
-        } else if (stype === 'fabtrack') {
-            html += '<div class="svc-app-block">';
-            if (data.interventions_total !== null && data.interventions_total !== undefined) {
-                html += '<div class="svc-stat"><i class="bi bi-clipboard-data"></i> <strong>' + data.interventions_total + '</strong> interventions</div>';
-                if (data.impression_3d_grammes) html += '<div class="svc-stat"><i class="bi bi-printer"></i> 3D : ' + data.impression_3d_grammes + ' g</div>';
-                if (data.decoupe_m2) html += '<div class="svc-stat"><i class="bi bi-scissors"></i> Découpe : ' + data.decoupe_m2 + ' m²</div>';
-            }
-            if (data.machines && data.machines.length) {
+            if (data.printing) html += '<div class="svc-stat text-info"><i class="bi bi-play-circle"></i> <strong>' + data.printing + '</strong> en cours d\'impression</div>';
+            if (data.printers && data.printers.length) {
                 html += '<div class="svc-machines">';
-                data.machines.forEach(function(m) {
-                    var cls = m.statut === 'disponible' ? 'svc-ok' : (m.statut === 'hors_service' ? 'svc-err' : 'svc-warn');
-                    html += '<span class="svc-machine ' + cls + '" title="' + escHtml(m.statut) + '">' + escHtml(m.nom) + '</span> ';
+                data.printers.forEach(function(p) {
+                    var cls = p.active ? 'svc-ok' : (p.online ? 'svc-warn' : 'svc-err');
+                    var tip = p.active ? (escHtml(p.job) + ' — ' + p.progress + '%') : (p.online ? 'En ligne / idle' : 'Hors ligne');
+                    if (p.temp_ext !== null && p.temp_ext !== undefined) tip += ' | ' + p.temp_ext + '°C';
+                    html += '<span class="svc-machine ' + cls + '" title="' + tip + '">' + escHtml(p.name) + (p.active ? ' <small>' + p.progress + '%</small>' : '') + '</span> ';
                 });
                 html += '</div>';
             }
-            if (data.interventions_total === null && (!data.machines || !data.machines.length)) {
-                html += '<div class="svc-stat text-muted"><i class="bi bi-info-circle"></i> Aucune donnée disponible</div>';
-            }
             html += '</div>';
         } else if (stype === 'pihole') {
-            html = '<span>Requetes : ' + (data.dns_queries_today || '\u2014') + '</span>'
-                 + ' <span>Bloquees : ' + (data.ads_blocked_today || '\u2014') + '</span>';
+            html = '<div class="svc-app-block">';
+            var pct = data.ads_percentage ? ' (' + data.ads_percentage + '%)' : '';
+            var statusCls = data.status === 'enabled' ? 'text-success' : 'text-warning';
+            html += '<div class="svc-stat ' + statusCls + '"><i class="bi bi-shield-check"></i> Pi-hole ' + (data.status || '—') + '</div>';
+            html += '<div class="svc-stat"><i class="bi bi-question-circle"></i> <strong>' + (data.dns_queries_today || 0).toLocaleString() + '</strong> requêtes aujourd\'hui</div>';
+            html += '<div class="svc-stat"><i class="bi bi-slash-circle"></i> <strong>' + (data.ads_blocked_today || 0).toLocaleString() + '</strong> bloquées' + pct + '</div>';
+            html += '</div>';
         } else if (stype === 'adguard') {
-            var stats = data.stats || data;
-            html = '<span>Requetes : ' + (stats.num_dns_queries || '\u2014') + '</span>'
-                 + ' <span>Bloquees : ' + (stats.num_blocked_filtering || '\u2014') + '</span>';
+            html = '<div class="svc-app-block">';
+            var protCls = data.protection_enabled ? 'text-success' : 'text-warning';
+            html += '<div class="svc-stat ' + protCls + '"><i class="bi bi-shield-check"></i> Protection ' + (data.protection_enabled ? 'active' : 'désactivée') + '</div>';
+            html += '<div class="svc-stat"><i class="bi bi-question-circle"></i> <strong>' + (data.num_dns_queries || 0).toLocaleString() + '</strong> requêtes aujourd\'hui</div>';
+            html += '<div class="svc-stat"><i class="bi bi-slash-circle"></i> <strong>' + (data.num_blocked_filtering || 0).toLocaleString() + '</strong> bloquées</div>';
+            html += '</div>';
         } else if (stype === 'uptimekuma') {
-            if (data.heartbeatList) {
-                var count = Object.keys(data.heartbeatList).length;
-                html = '<span>' + count + ' moniteurs</span>';
+            html = '<div class="svc-app-block">';
+            if (data.total !== undefined) {
+                var downCls = data.down > 0 ? 'text-danger' : 'text-success';
+                html += '<div class="svc-stat"><i class="bi bi-activity"></i> <strong class="text-success">' + (data.up || 0) + '</strong> up';
+                if (data.down) html += ', <strong class="text-danger">' + data.down + '</strong> down';
+                html += ' / ' + (data.total || 0) + ' moniteurs</div>';
             } else {
-                html = '<span>Connecte</span>';
+                html += '<div class="svc-stat"><i class="bi bi-activity"></i> Connecté</div>';
             }
+            html += '</div>';
         } else if (stype === 'docker') {
             html = '<div class="svc-app-block">';
             html += '<div class="svc-stat"><i class="bi bi-box"></i> <strong>' + (data.total || 0) + '</strong> containers';

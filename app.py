@@ -580,61 +580,99 @@ def api_service_proxy(sid):
             resp = urlopen(req, timeout=10, context=ctx)
             return json.loads(resp.read().decode())
 
-        # ── PrêtGo : agrège inventaire + personnes
-        if svc_type == 'pretgo':
-            result = {'type': 'pretgo'}
-            errors = []
+        # ── Pi-hole : statistiques DNS blocking
+        if svc_type == 'pihole':
+            result = {'type': 'pihole'}
             try:
-                inv = _fetch_json(svc_url + '/api/inventaire')
-                items = inv if isinstance(inv, list) else inv.get('data', inv.get('items', []))
-                result['total_materiel'] = len(items)
-                etats = {}
-                for it in items:
-                    e = it.get('etat', it.get('état', 'inconnu'))
-                    etats[e] = etats.get(e, 0) + 1
-                result['etats'] = etats
+                api_key = svc.get('api_key') or ''
+                auth = f'&auth={api_key}' if api_key else ''
+                data = _fetch_json(f'{svc_url}/admin/api.php?summaryRaw{auth}')
+                result['dns_queries_today'] = data.get('dns_queries_today', 0)
+                result['ads_blocked_today'] = data.get('ads_blocked_today', 0)
+                result['ads_percentage'] = round(float(data.get('ads_percentage_today', 0)), 1)
+                result['domains_blocked'] = data.get('domains_being_blocked', 0)
+                result['status'] = data.get('status', 'unknown')
             except Exception as e:
-                result['total_materiel'] = None
-                errors.append(f'inventaire: {e}')
-            try:
-                pers = _fetch_json(svc_url + '/api/personnes')
-                plist = pers if isinstance(pers, list) else pers.get('data', pers.get('items', []))
-                result['total_personnes'] = len(plist)
-            except Exception as e:
-                result['total_personnes'] = None
-                errors.append(f'personnes: {e}')
-            if result['total_materiel'] is None and result['total_personnes'] is None:
-                result['error'] = f'Impossible de joindre PrêtGo ({svc_url})'
-                logger.warning(f"PretGo proxy errors: {'; '.join(errors)}")
+                result['error'] = f'Pi-hole API: {e}'
             return jsonify(result)
 
-        # ── Fabtrack : résumé stats + machines
-        if svc_type == 'fabtrack':
-            result = {'type': 'fabtrack'}
-            errors = []
+        # ── AdGuard Home : statistiques DNS blocking
+        if svc_type == 'adguard':
+            import base64
+            result = {'type': 'adguard'}
             try:
-                summary = _fetch_json(svc_url + '/api/stats/summary')
-                result['interventions_total'] = summary.get('interventions_total', 0)
-                result['impression_3d_grammes'] = summary.get('impression_3d_grammes', 0)
-                result['decoupe_m2'] = summary.get('decoupe_m2', 0)
-                result['papier_feuilles'] = summary.get('papier_feuilles', 0)
-                by_type = summary.get('by_type', [])
-                result['by_type'] = by_type[:5] if isinstance(by_type, list) else []
+                api_key = svc.get('api_key') or ''
+                if api_key and ':' in api_key:
+                    headers['Authorization'] = 'Basic ' + base64.b64encode(api_key.encode()).decode()
+                stats = _fetch_json(f'{svc_url}/control/stats')
+                result['num_dns_queries'] = stats.get('num_dns_queries', 0)
+                result['num_blocked_filtering'] = stats.get('num_blocked_filtering', 0)
+                result['avg_processing_ms'] = round(stats.get('avg_processing_time', 0) * 1000, 2)
+                status = _fetch_json(f'{svc_url}/control/status')
+                result['running'] = status.get('running', False)
+                result['protection_enabled'] = status.get('protection_enabled', False)
             except Exception as e:
-                result['interventions_total'] = None
-                errors.append(f'stats: {e}')
+                result['error'] = f'AdGuard API: {e}'
+            return jsonify(result)
+
+        # ── Uptime Kuma : monitoring
+        if svc_type == 'uptimekuma':
+            result = {'type': 'uptimekuma'}
             try:
-                ref = _fetch_json(svc_url + '/api/reference')
-                machines = ref.get('machines', [])
-                result['machines_total'] = len(machines)
-                result['machines_actives'] = len([m for m in machines if m.get('actif')])
-                result['machines'] = [{'nom': m.get('nom', ''), 'statut': m.get('statut', '')} for m in machines[:8]]
+                page = _fetch_json(f'{svc_url}/api/status-page/default')
+                groups = page.get('publicGroupList', [])
+                monitors = [m for g in groups for m in g.get('monitorList', [])]
+                result['total'] = len(monitors)
+                result['up'] = sum(1 for m in monitors if m.get('active', False))
+                result['down'] = result['total'] - result['up']
             except Exception as e:
-                result['machines_total'] = None
-                errors.append(f'reference: {e}')
-            if result['interventions_total'] is None and result.get('machines_total') is None:
-                result['error'] = f'Impossible de joindre Fabtrack ({svc_url})'
-                logger.warning(f"Fabtrack proxy errors: {'; '.join(errors)}")
+                result['error'] = f'Uptime Kuma: {e}'
+            return jsonify(result)
+
+        # ── Repetier-Server : imprimantes 3D
+        if svc_type == 'repetier':
+            result = {'type': 'repetier'}
+            try:
+                api_key = svc.get('api_key') or ''
+                printer_data = _fetch_json(f'{svc_url}/printer/list?apikey={api_key}')
+                printers_raw = printer_data.get('data', [])
+                result['total'] = len(printers_raw)
+                result['online'] = 0
+                result['printing'] = 0
+                result['printers'] = []
+                for p in printers_raw[:8]:
+                    slug = p.get('slug', '')
+                    info = {
+                        'name': p.get('name', slug),
+                        'slug': slug,
+                        'online': p.get('online', 0) == 1,
+                        'active': False,
+                        'progress': 0,
+                        'job': '',
+                        'temp_ext': None,
+                        'temp_bed': None,
+                    }
+                    if info['online']:
+                        result['online'] += 1
+                        try:
+                            state = _fetch_json(f'{svc_url}/printer/api/{slug}?a=stateList&apikey={api_key}')
+                            sd = state.get('data', {})
+                            ext = sd.get('extruder', [])
+                            if ext:
+                                info['temp_ext'] = round(ext[0].get('tempRead', 0), 1)
+                            beds = sd.get('heatedBeds', [])
+                            if beds:
+                                info['temp_bed'] = round(beds[0].get('tempRead', 0), 1)
+                            info['job'] = sd.get('job', '')
+                            info['progress'] = round(sd.get('done', 0), 1)
+                            info['active'] = bool(sd.get('active', False))
+                            if info['active']:
+                                result['printing'] += 1
+                        except Exception:
+                            pass
+                    result['printers'].append(info)
+            except Exception as e:
+                result['error'] = f'Repetier-Server API: {e}'
             return jsonify(result)
 
         # ── Docker : containers via API
