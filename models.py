@@ -103,6 +103,25 @@ def init_db():
             sort_order INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_links_group ON links(group_id);
+
+        CREATE TABLE IF NOT EXISTS suite_apps (
+            id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+            url                    TEXT    NOT NULL UNIQUE,
+            app_id                 TEXT    NOT NULL DEFAULT '',
+            name                   TEXT    NOT NULL DEFAULT '',
+            version                TEXT    NOT NULL DEFAULT '',
+            suite_version          TEXT    NOT NULL DEFAULT '',
+            description            TEXT    NOT NULL DEFAULT '',
+            icon                   TEXT    NOT NULL DEFAULT 'bi-app',
+            color                  TEXT    NOT NULL DEFAULT '#6c757d',
+            status                 TEXT    NOT NULL DEFAULT 'unknown',
+            capabilities           TEXT    NOT NULL DEFAULT '[]',
+            widgets_json           TEXT    NOT NULL DEFAULT '[]',
+            notifications_endpoint TEXT    NOT NULL DEFAULT '',
+            last_seen              TEXT    NOT NULL DEFAULT '',
+            last_error             TEXT    NOT NULL DEFAULT '',
+            enabled                INTEGER NOT NULL DEFAULT 1
+        );
     ''')
 
     # ── Migrations ────────────────────────────────────────
@@ -704,6 +723,98 @@ def delete_grid_widget(wid):
     """Supprime un widget de grille"""
     conn = get_db()
     conn.execute('DELETE FROM group_widgets WHERE id=?', (wid,))
+    conn.commit()
+    conn.close()
+
+
+# ── FabLab Suite Apps ────────────────────────────────────
+
+def get_suite_apps():
+    conn = get_db()
+    rows = [dict(r) for r in conn.execute(
+        'SELECT * FROM suite_apps ORDER BY name, id').fetchall()]
+    conn.close()
+    for r in rows:
+        r['capabilities'] = json.loads(r['capabilities'])
+        r['widgets_json'] = json.loads(r['widgets_json'])
+    return rows
+
+
+def get_suite_app(app_id):
+    conn = get_db()
+    row = conn.execute('SELECT * FROM suite_apps WHERE id=?', (app_id,)).fetchone()
+    conn.close()
+    if row:
+        r = dict(row)
+        r['capabilities'] = json.loads(r['capabilities'])
+        r['widgets_json'] = json.loads(r['widgets_json'])
+        return r
+    return None
+
+
+def create_suite_app(url, manifest):
+    """Crée une app suite à partir de son URL et de son manifest."""
+    conn = get_db()
+    cur = conn.execute(
+        'INSERT OR REPLACE INTO suite_apps '
+        '(url, app_id, name, version, suite_version, description, icon, color, '
+        ' status, capabilities, widgets_json, notifications_endpoint, last_seen) '
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime("now","localtime"))',
+        (url.rstrip('/'),
+         manifest.get('app', ''),
+         manifest.get('name', ''),
+         manifest.get('version', ''),
+         manifest.get('suite_version', ''),
+         manifest.get('description', ''),
+         manifest.get('icon', 'bi-app'),
+         manifest.get('color', '#6c757d'),
+         manifest.get('status', 'running'),
+         json.dumps(manifest.get('capabilities', [])),
+         json.dumps(manifest.get('widgets', [])),
+         manifest.get('notifications', {}).get('endpoint', '')))
+    aid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return aid
+
+
+def update_suite_app_manifest(app_id, manifest):
+    """Met à jour une app suite depuis son manifest rafraîchi."""
+    conn = get_db()
+    conn.execute(
+        'UPDATE suite_apps SET '
+        'app_id=?, name=?, version=?, suite_version=?, description=?, icon=?, color=?, '
+        'status=?, capabilities=?, widgets_json=?, notifications_endpoint=?, '
+        'last_seen=datetime("now","localtime"), last_error="" '
+        'WHERE id=?',
+        (manifest.get('app', ''),
+         manifest.get('name', ''),
+         manifest.get('version', ''),
+         manifest.get('suite_version', ''),
+         manifest.get('description', ''),
+         manifest.get('icon', 'bi-app'),
+         manifest.get('color', '#6c757d'),
+         manifest.get('status', 'running'),
+         json.dumps(manifest.get('capabilities', [])),
+         json.dumps(manifest.get('widgets', [])),
+         manifest.get('notifications', {}).get('endpoint', ''),
+         app_id))
+    conn.commit()
+    conn.close()
+
+
+def update_suite_app_status(app_id, status, error=''):
+    conn = get_db()
+    conn.execute(
+        'UPDATE suite_apps SET status=?, last_error=?, last_seen=datetime("now","localtime") WHERE id=?',
+        (status, error, app_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_suite_app(app_id):
+    conn = get_db()
+    conn.execute('DELETE FROM suite_apps WHERE id=?', (app_id,))
     conn.commit()
     conn.close()
 

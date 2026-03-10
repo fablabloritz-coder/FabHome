@@ -460,6 +460,8 @@
             if (camCfg) camCfg.style.display = type === 'camera' ? '' : 'none';
             var svcCfg = qs('#widgetConfigService');
             if (svcCfg) svcCfg.style.display = type === 'service' ? '' : 'none';
+            var suiteCfg = qs('#widgetConfigFabsuite');
+            if (suiteCfg) suiteCfg.style.display = type === 'fabsuite' ? '' : 'none';
         });
     }
     
@@ -1332,6 +1334,123 @@
         });
         bsModal.show();
     }
+    /* ══════════════════════════════════════
+       FABLAB SUITE
+       ══════════════════════════════════════ */
+
+    // Add suite app from settings tab
+    function suiteAddApp(urlInput) {
+        const url = (urlInput.value || '').trim();
+        if (!url) return;
+        urlInput.disabled = true;
+        api('POST', '/api/suite/apps', { url })
+            .then(r => {
+                if (r.error) { showToast(r.error, 'danger'); urlInput.disabled = false; return; }
+                showToast(`${r.app.name} ajouté !`, 'success');
+                setTimeout(() => location.reload(), 500);
+            })
+            .catch(() => { showToast('Erreur de connexion', 'danger'); urlInput.disabled = false; });
+    }
+
+    const suiteAddBtn = qs('#suiteAddBtn');
+    if (suiteAddBtn) suiteAddBtn.onclick = () => suiteAddApp(qs('#suiteUrlInput'));
+
+    const suiteAppAddBtn = qs('#suiteAppAdd');
+    if (suiteAppAddBtn) suiteAppAddBtn.onclick = () => suiteAddApp(qs('#suiteAppUrl'));
+
+    // Delete suite app
+    document.addEventListener('click', e => {
+        const del = e.target.closest('[data-action="delete-suite-app"]');
+        if (del) {
+            const id = del.dataset.id;
+            if (!confirm('Retirer cette application de la suite ?')) return;
+            api('DELETE', `/api/suite/apps/${id}`).then(() => location.reload());
+        }
+    });
+
+    // Refresh all
+    const suiteRefreshBtn = qs('#suiteRefreshBtn');
+    if (suiteRefreshBtn) suiteRefreshBtn.onclick = () => {
+        suiteRefreshBtn.disabled = true;
+        suiteRefreshBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Rafraîchissement...';
+        api('POST', '/api/suite/apps/refresh').then(() => {
+            return api('GET', '/api/suite/apps');
+        }).then(apps => {
+            apps.forEach(a => {
+                const row = qs(`[data-suite-id="${a.id}"]`);
+                if (row) {
+                    const dot = row.querySelector('.suite-app-status');
+                    if (dot) dot.className = 'suite-app-status suite-status-' + a.status;
+                }
+            });
+            showToast('Applications rafraîchies', 'success');
+            suiteRefreshBtn.disabled = false;
+            suiteRefreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Rafraîchir toutes les apps';
+        }).catch(() => {
+            showToast('Erreur lors du rafraîchissement', 'danger');
+            suiteRefreshBtn.disabled = false;
+            suiteRefreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Rafraîchir toutes les apps';
+        });
+    };
+
+    // Suite widget: load dashboard data
+    function loadSuiteDashboard() {
+        qsa('.gw-fabsuite').forEach(el => {
+            api('GET', '/api/suite/dashboard').then(apps => {
+                const container = el.querySelector('.gw-fabsuite-apps');
+                const widgetArea = el.querySelector('.gw-fabsuite-widgets');
+                if (!apps.length) return;
+
+                // Update status dots
+                apps.forEach(a => {
+                    const card = container.querySelector(`[data-suite-app-id="${a.id}"]`);
+                    if (card) {
+                        const dot = card.querySelector('.suite-app-status');
+                        if (dot) {
+                            dot.className = 'suite-app-status suite-status-' + a.status;
+                            dot.title = a.status;
+                        }
+                    }
+                });
+
+                // Render widget badges
+                if (widgetArea) {
+                    let html = '';
+                    apps.forEach(a => {
+                        a.widgets.forEach(w => {
+                            if (w.error) return;
+                            const meta = w._meta || {};
+                            if (meta.type === 'counter' && w.value !== undefined) {
+                                html += `<span class="suite-widget-badge" style="border-left:3px solid ${a.color}">
+                                    ${escHtml(meta.label)} <span class="suite-wb-value">${w.value}</span>
+                                </span>`;
+                            }
+                        });
+                    });
+                    widgetArea.innerHTML = html;
+                }
+            }).catch(() => {});
+        });
+    }
+
+    // Suite widget refresh button
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.gw-suite-refresh');
+        if (btn) {
+            btn.classList.add('spin');
+            api('POST', '/api/suite/apps/refresh').then(() => {
+                loadSuiteDashboard();
+                setTimeout(() => btn.classList.remove('spin'), 1000);
+            });
+        }
+    });
+
+    // Load suite dashboard on init + interval
+    if (qsa('.gw-fabsuite').length) {
+        loadSuiteDashboard();
+        setInterval(loadSuiteDashboard, 120000); // 2 min
+    }
+
     /* ══════════════════════════════════════
        INITIALISATION
        ══════════════════════════════════════ */

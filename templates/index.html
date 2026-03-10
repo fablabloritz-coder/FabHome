@@ -235,6 +235,35 @@
                     <div class="gw-camera-placeholder"><i class="bi bi-camera-video"></i><span>Aucune URL configurée</span></div>
                     {% endif %}
                 </div>
+                {% elif gw.type == 'fabsuite' %}
+                <div class="gw-card-body gw-fabsuite" data-gw-id="{{ gw.id }}">
+                    <div class="gw-fabsuite-header">
+                        <i class="bi bi-boxes"></i>
+                        <span>FabLab Suite</span>
+                        <button class="btn btn-sm btn-outline-light gw-suite-refresh" title="Rafraîchir"><i class="bi bi-arrow-clockwise"></i></button>
+                    </div>
+                    <div class="gw-fabsuite-apps">
+                        {% for sa in suite_apps %}
+                        <div class="suite-app-card" data-suite-app-id="{{ sa.id }}" data-url="{{ sa.url }}">
+                            <div class="suite-app-icon" style="background:{{ sa.color }}">
+                                <i class="bi {{ sa.icon }}"></i>
+                            </div>
+                            <div class="suite-app-info">
+                                <a href="{{ sa.url }}" target="_blank" class="suite-app-name">{{ sa.name }}</a>
+                                <span class="suite-app-desc">{{ sa.description }}</span>
+                            </div>
+                            <span class="suite-app-status suite-status-{{ sa.status }}" title="{{ sa.status }}"></span>
+                        </div>
+                        {% endfor %}
+                        {% if not suite_apps %}
+                        <div class="suite-empty">
+                            <i class="bi bi-plus-circle"></i>
+                            <span>Aucune app. Ajoutez-en depuis les paramètres.</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="gw-fabsuite-widgets"></div>
+                </div>
                 {% elif gw.type == 'service' %}
                 {% set svc_id = gw.config.get('service_id', 0)|int %}
                 {% set svc_match = services|selectattr('id', 'equalto', svc_id)|list %}
@@ -530,9 +559,18 @@
                             <option value="calendar">📅 Calendrier</option>
                             <option value="camera">📷 Caméra</option>
                             <option value="service">🔌 Service</option>
+                            <option value="fabsuite">🔗 FabLab Suite</option>
                         </select>
                     </div>
-                    
+
+                    <div class="mb-3" id="widgetConfigFabsuite" style="display: none;">
+                        <div class="alert alert-info small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Ce widget affiche toutes vos applications FabLab Suite enregistrées avec leur statut en temps réel.
+                            Ajoutez des apps dans <strong>Réglages › FabLab Suite</strong>.
+                        </div>
+                    </div>
+
                     <div class="mb-3" id="widgetConfigNote" style="display: none;">
                         <label class="form-label">Texte de la note</label>
                         <textarea class="form-control" name="note_text" rows="3" maxlength="500"></textarea>
@@ -632,6 +670,9 @@
                         </li>
                         <li class="nav-item">
                             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stServices" type="button">Services</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stSuite" type="button">FabLab Suite</button>
                         </li>
                         <li class="nav-item">
                             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stData" type="button">Données</button>
@@ -840,6 +881,49 @@
                                 <i class="bi bi-plus-lg"></i> Ajouter un service
                             </button>
                         </div>
+                        <div class="tab-pane fade" id="stSuite">
+                            <p class="text-muted mb-3">Connectez les applications de la FabLab Suite pour afficher leurs informations sur le dashboard.</p>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="suiteUrlInput"
+                                       placeholder="http://192.168.1.x:5555">
+                                <button class="btn btn-primary" type="button" id="suiteAddBtn">
+                                    <i class="bi bi-plus-lg"></i> Ajouter
+                                </button>
+                            </div>
+                            <div id="suiteAppsAdmin">
+                                {% for sa in suite_apps %}
+                                <div class="settings-widget-row suite-admin-row" data-suite-id="{{ sa.id }}">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="suite-app-icon-sm" style="background:{{ sa.color }}">
+                                                <i class="bi {{ sa.icon }}"></i>
+                                            </span>
+                                            <div>
+                                                <strong>{{ sa.name }}</strong> <small class="text-muted">v{{ sa.version }}</small>
+                                                <br><small class="text-muted">{{ sa.url }}</small>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="suite-app-status suite-status-{{ sa.status }}"></span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete-suite-app" data-id="{{ sa.id }}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">{{ sa.description }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if suite_apps %}
+                            <button type="button" class="btn btn-outline-secondary w-100 mt-2" id="suiteRefreshBtn">
+                                <i class="bi bi-arrow-clockwise"></i> Rafraîchir toutes les apps
+                            </button>
+                            {% endif %}
+                            <div class="alert alert-info mt-3 small">
+                                <i class="bi bi-info-circle"></i>
+                                Ajoutez un widget <strong>FabLab Suite</strong> sur votre dashboard pour voir les informations en temps réel.
+                            </div>
+                        </div>
                         <div class="tab-pane fade" id="stData">
                             <div class="settings-widget-row">
                                 <strong><i class="bi bi-download"></i> Exporter la configuration</strong>
@@ -956,6 +1040,38 @@
         </div>
     </div>
 </div>
+<!-- MODAL FABLAB SUITE -->
+<div class="modal fade" id="suiteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-boxes"></i> FabLab Suite</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Ajouter une application</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="suiteAppUrl"
+                               placeholder="http://192.168.1.x:5555">
+                        <button class="btn btn-primary" type="button" id="suiteAppAdd">
+                            <i class="bi bi-plus-lg"></i> Ajouter
+                        </button>
+                    </div>
+                    <div class="form-text">Entrez l'URL d'une application FabLab Suite (Fabtrack, PretGo, FabBoard...)</div>
+                </div>
+                <hr>
+                <div id="suiteAppsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="suiteRefreshAll">
+                    <i class="bi bi-arrow-clockwise"></i> Tout rafraîchir
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -969,7 +1085,8 @@ const PAGE_DATA = {
     services: {{ services_json | safe }},
     profiles: {{ profiles_json | safe }},
     currentPage: {{ current_page }},
-    editOnLoad: {{ 'true' if request.args.get('edit') else 'false' }}
+    editOnLoad: {{ 'true' if request.args.get('edit') else 'false' }},
+    suiteApps: {{ suite_apps_json | safe }}
 };
 </script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
