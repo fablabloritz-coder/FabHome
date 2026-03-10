@@ -460,6 +460,8 @@
             if (camCfg) camCfg.style.display = type === 'camera' ? '' : 'none';
             var svcCfg = qs('#widgetConfigService');
             if (svcCfg) svcCfg.style.display = type === 'service' ? '' : 'none';
+            var suiteCfg = qs('#widgetConfigFabsuite');
+            if (suiteCfg) suiteCfg.style.display = type === 'fabsuite' ? '' : 'none';
         });
     }
     
@@ -1371,10 +1373,24 @@
     if (suiteRefreshBtn) suiteRefreshBtn.onclick = () => {
         suiteRefreshBtn.disabled = true;
         suiteRefreshBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Rafraîchissement...';
-        api('POST', '/api/suite/apps/refresh').then(results => {
+        api('POST', '/api/suite/apps/refresh').then(() => {
+            return api('GET', '/api/suite/apps');
+        }).then(apps => {
+            apps.forEach(a => {
+                const row = qs(`[data-suite-id="${a.id}"]`);
+                if (row) {
+                    const dot = row.querySelector('.suite-app-status');
+                    if (dot) dot.className = 'suite-app-status suite-status-' + a.status;
+                }
+            });
             showToast('Applications rafraîchies', 'success');
-            setTimeout(() => location.reload(), 500);
-        }).catch(() => { showToast('Erreur', 'danger'); suiteRefreshBtn.disabled = false; });
+            suiteRefreshBtn.disabled = false;
+            suiteRefreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Rafraîchir toutes les apps';
+        }).catch(() => {
+            showToast('Erreur lors du rafraîchissement', 'danger');
+            suiteRefreshBtn.disabled = false;
+            suiteRefreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Rafraîchir toutes les apps';
+        });
     };
 
     // Suite widget: load dashboard data
