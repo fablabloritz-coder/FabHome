@@ -1341,7 +1341,7 @@
         const url = (urlInput.value || '').trim();
         if (!url) return;
         urlInput.disabled = true;
-        api('/api/suite/apps', 'POST', { url })
+        api('POST', '/api/suite/apps', { url })
             .then(r => {
                 if (r.error) { showToast(r.error, 'danger'); urlInput.disabled = false; return; }
                 showToast(`${r.app.name} ajouté !`, 'success');
@@ -1362,7 +1362,7 @@
         if (del) {
             const id = del.dataset.id;
             if (!confirm('Retirer cette application de la suite ?')) return;
-            api(`/api/suite/apps/${id}`, 'DELETE').then(() => location.reload());
+            api('DELETE', `/api/suite/apps/${id}`).then(() => location.reload());
         }
     });
 
@@ -1371,7 +1371,7 @@
     if (suiteRefreshBtn) suiteRefreshBtn.onclick = () => {
         suiteRefreshBtn.disabled = true;
         suiteRefreshBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Rafraîchissement...';
-        api('/api/suite/apps/refresh', 'POST').then(results => {
+        api('POST', '/api/suite/apps/refresh').then(results => {
             showToast('Applications rafraîchies', 'success');
             setTimeout(() => location.reload(), 500);
         }).catch(() => { showToast('Erreur', 'danger'); suiteRefreshBtn.disabled = false; });
@@ -1380,7 +1380,7 @@
     // Suite widget: load dashboard data
     function loadSuiteDashboard() {
         qsa('.gw-fabsuite').forEach(el => {
-            api('/api/suite/dashboard').then(apps => {
+            api('GET', '/api/suite/dashboard').then(apps => {
                 const container = el.querySelector('.gw-fabsuite-apps');
                 const widgetArea = el.querySelector('.gw-fabsuite-widgets');
                 if (!apps.length) return;
@@ -1422,7 +1422,7 @@
         const btn = e.target.closest('.gw-suite-refresh');
         if (btn) {
             btn.classList.add('spin');
-            api('/api/suite/apps/refresh', 'POST').then(() => {
+            api('POST', '/api/suite/apps/refresh').then(() => {
                 loadSuiteDashboard();
                 setTimeout(() => btn.classList.remove('spin'), 1000);
             });
