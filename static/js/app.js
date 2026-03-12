@@ -51,6 +51,34 @@
         var pg = PAGE_DATA.currentPage;
         return pg && pg !== 1 ? '/?page=' + pg + '&edit=1' : '/?edit=1';
     }
+    function normalizeHttpUrl(rawUrl, fallbackUrl) {
+        var url = (rawUrl || '').trim();
+        if (!url) return fallbackUrl || '';
+        if (url.indexOf('is://') === 0) {
+            url = 'https://' + url.slice(5);
+        }
+        if (!/^https?:\/\//i.test(url)) {
+            url = 'http://' + url;
+        }
+        return url.replace(/\/+$/, '');
+    }
+    function browserSafeUrl(url) {
+        return String(url || '').replace(/host\.docker\.internal/gi, 'localhost');
+    }
+    function joinBaseUrl(baseUrl, suffix) {
+        return String(baseUrl || '').replace(/\/+$/, '') + suffix;
+    }
+    function findFirstFreeSlot(colSpan, rowSpan) {
+        buildOccupiedMap();
+        for (var row = 0; row < gridRows; row++) {
+            for (var col = 0; col < gridCols; col++) {
+                if (canPlace(row, col, colSpan, rowSpan)) {
+                    return { row: row, col: col };
+                }
+            }
+        }
+        return null;
+    }
     /* ══════════════════════════════════════
        ETAT DE LA GRILLE
        ══════════════════════════════════════ */
@@ -533,7 +561,12 @@
                 caldav_url: f.elements.caldav_url ? f.elements.caldav_url.value : '',
                 caldav_username: f.elements.caldav_username ? f.elements.caldav_username.value : '',
                 caldav_password: f.elements.caldav_password ? f.elements.caldav_password.value : '',
-                camera_urls: f.elements.camera_urls ? f.elements.camera_urls.value : ''
+                camera_urls: f.elements.camera_urls ? f.elements.camera_urls.value : '',
+                fabboard_url: browserSafeUrl(normalizeHttpUrl(
+                    f.elements.fabboard_url ? f.elements.fabboard_url.value : '',
+                    'http://localhost:5580'
+                )),
+                fabboard_default_widget: f.elements.fabboard_default_widget ? f.elements.fabboard_default_widget.value : 'missions'
             };
             if (f.elements.theme.value === 'custom') {
                 settingsBody.custom_accent = f.elements.custom_accent ? f.elements.custom_accent.value : '#ff6b35';
@@ -1123,6 +1156,128 @@
                 break;
         }
     });
+    
+    /* -- Actions spécifiques FabBoard -- */
+    var testFabBoardBtn = qs('#testFabBoardBtn');
+    if (testFabBoardBtn) {
+        testFabBoardBtn.addEventListener('click', function() {
+            var urlInput = qs('input[name="fabboard_url"]');
+            var rawUrl = urlInput ? urlInput.value.trim() : '';
+            var url = normalizeHttpUrl(rawUrl, 'http://localhost:5580');
+            if (!url) {
+                showToast('Veuillez saisir une URL FabBoard', 'error');
+                return;
+            }
+            if (urlInput) urlInput.value = url;
+            testFabBoardBtn.disabled = true;
+            testFabBoardBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Test...';
+
+            api('POST', '/api/suite/test-url', { url: url })
+                .then(function(data) {
+                    var safeUrl = data && data.browser_url ? data.browser_url : browserSafeUrl(url);
+                    if (urlInput && safeUrl) {
+                        urlInput.value = safeUrl;
+                    }
+                    showToast('FabBoard accessible', 'success');
+                    testFabBoardBtn.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> OK';
+                })
+                .catch(function(err) {
+                    showToast('FabBoard non accessible - ' + err.message, 'error');
+                    testFabBoardBtn.innerHTML = '<i class="bi bi-x-circle text-danger"></i> Erreur';
+                })
+                .finally(function() {
+                    setTimeout(function() {
+                        testFabBoardBtn.disabled = false;
+                        testFabBoardBtn.innerHTML = '<i class="bi bi-check-circle"></i> Tester';
+                    }, 2000);
+                });
+        });
+    }
+    
+    var addFabBoardShortcut = qs('#addFabBoardShortcut');
+    if (addFabBoardShortcut) {
+        addFabBoardShortcut.addEventListener('click', function() {
+            var urlInput = qs('input[name="fabboard_url"]');
+            var widgetSelect = qs('select[name="fabboard_default_widget"]');
+            var baseUrl = normalizeHttpUrl(urlInput ? urlInput.value : '', 'http://localhost:5580');
+            var browserUrl = browserSafeUrl(baseUrl);
+            var widget = widgetSelect ? widgetSelect.value : 'missions';
+
+            if (urlInput) {
+                urlInput.value = browserUrl;
+            }
+
+            var targetPos = findFirstFreeSlot(2, 1);
+            if (!targetPos) {
+                showToast('Aucune place libre pour un bloc FabBoard (2x1)', 'error');
+                return;
+            }
+
+            var body = {
+                name: 'FabBoard TV',
+                icon: 'bi-tv',
+                col_span: 2,
+                row_span: 1,
+                page_id: PAGE_DATA.currentPage || 1,
+                grid_row: targetPos.row,
+                grid_col: targetPos.col
+            };
+
+            api('POST', '/api/groups', body)
+                .then(function(response) {
+                    var groupId = response.id;
+                    var dashboardUrl = joinBaseUrl(browserUrl, '/?widget=' + encodeURIComponent(widget));
+                    var settingsUrl = joinBaseUrl(browserUrl, '/parametres');
+
+                    return Promise.all([
+                        api('POST', '/api/links', {
+                        group_id: groupId,
+                        name: 'Dashboard TV',
+                        url: dashboardUrl,
+                        icon: 'bi-display',
+                        description: 'Tableau de bord TV - ' + widget
+                        }),
+                        api('POST', '/api/links', {
+                            group_id: groupId,
+                            name: 'Paramètres FabBoard',
+                            url: settingsUrl,
+                            icon: 'bi-gear',
+                            description: 'Accès direct aux paramètres FabBoard'
+                        })
+                    ]);
+                })
+                .then(function() {
+                    showToast('Raccourci FabBoard ajouté', 'success');
+                    if (settingsModal) settingsModal.hide();
+                    setTimeout(function() { location.href = editUrl(); }, 500);
+                })
+                .catch(function(err) {
+                    if (String(err.message || '').toLowerCase().indexOf('collision') !== -1) {
+                        showToast('Impossible de placer le raccourci: zone occupée', 'error');
+                        return;
+                    }
+                    if (String(err.message || '').toLowerCase().indexOf('hors limites') !== -1) {
+                        showToast('Impossible de placer le raccourci: pas de place disponible', 'error');
+                        return;
+                    }
+                    showToast('Erreur création raccourci: ' + err.message, 'error');
+                });
+        });
+    }
+    
+    var openFabBoardFullscreen = qs('#openFabBoardFullscreen');
+    if (openFabBoardFullscreen) {
+        openFabBoardFullscreen.addEventListener('click', function() {
+            var urlInput = qs('input[name="fabboard_url"]');
+            var widgetSelect = qs('select[name="fabboard_default_widget"]');
+            var url = browserSafeUrl(normalizeHttpUrl(urlInput ? urlInput.value : '', 'http://localhost:5580'));
+            var widget = widgetSelect ? widgetSelect.value : 'missions';
+
+            var fullUrl = joinBaseUrl(url, '/?widget=' + encodeURIComponent(widget) + '&fullscreen=1');
+            window.open(fullUrl, '_blank', 'width=1920,height=1080,fullscreen=yes');
+            showToast('FabBoard ouvert en plein écran 🖥️', 'info');
+        });
+    }
     /* ══════════════════════════════════════
        INITIALISATION
        ══════════════════════════════════════ */

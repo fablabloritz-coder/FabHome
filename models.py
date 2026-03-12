@@ -256,6 +256,8 @@ def init_db():
         'caldav_password': '',
         'camera_urls': '',
         'refresh_interval': '30',
+        'fabboard_url': 'http://localhost:5580',
+        'fabboard_default_widget': 'missions',
     }.items():
         conn.execute('INSERT OR IGNORE INTO settings (profile_id, key, value) VALUES (1, ?, ?)', (k, v))
 
@@ -313,6 +315,8 @@ def create_profile(name, icon='👤', color='#6c757d'):
         'caldav_password': '',
         'camera_urls': '',
         'refresh_interval': '30',
+        'fabboard_url': 'http://localhost:5580',
+        'fabboard_default_widget': 'missions',
     }.items():
         conn.execute('INSERT INTO settings (profile_id, key, value) VALUES (?, ?, ?)',
                      (profile_id, k, v))

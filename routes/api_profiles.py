@@ -85,7 +85,8 @@ def api_update_settings():
                    'search_provider', 'grid_cols', 'grid_rows',
                    'caldav_url', 'caldav_username', 'caldav_password', 'camera_urls',
                    'refresh_interval',
-                   'custom_accent', 'custom_bg', 'custom_card_bg', 'custom_text'}
+                   'custom_accent', 'custom_bg', 'custom_card_bg', 'custom_text',
+                   'fabboard_url', 'fabboard_default_widget'}
         for k, v in data.items():
             if k in allowed:
                 models.update_setting(k, str(v)[:500], profile_id)

@@ -250,6 +250,11 @@
                             </div>
                             <div class="suite-app-info">
                                 <a href="{{ sa.browser_url }}" target="_blank" class="suite-app-name">{{ sa.name }}</a>
+                                {% if sa.app_id == 'fabboard' %}
+                                <a href="{{ (sa.browser_url or sa.url).rstrip('/') }}/parametres" target="_blank" class="suite-app-desc" style="text-decoration: underline;">
+                                    Paramètres FabBoard
+                                </a>
+                                {% endif %}
                                 <span class="suite-app-desc">{{ sa.description }}</span>
                             </div>
                             <span class="suite-app-status suite-status-{{ sa.status }}" title="{{ sa.status }}"></span>
@@ -675,6 +680,9 @@
                             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stSuite" type="button">FabLab Suite</button>
                         </li>
                         <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stFabBoard" type="button">FabBoard</button>
+                        </li>
+                        <li class="nav-item">
                             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stData" type="button">Données</button>
                         </li>
                     </ul>
@@ -904,6 +912,14 @@
                                             </div>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
+                                            {% if sa.app_id == 'fabboard' %}
+                                            <a href="{{ sa.browser_url }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Ouvrir FabBoard">
+                                                <i class="bi bi-display"></i>
+                                            </a>
+                                            <a href="{{ (sa.browser_url or sa.url).rstrip('/') }}/parametres" target="_blank" class="btn btn-sm btn-outline-secondary" title="Paramètres FabBoard">
+                                                <i class="bi bi-gear"></i>
+                                            </a>
+                                            {% endif %}
                                             <span class="suite-app-status suite-status-{{ sa.status }}"></span>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete-suite-app" data-id="{{ sa.id }}">
                                                 <i class="bi bi-trash"></i>
@@ -922,6 +938,48 @@
                             <div class="alert alert-info mt-3 small">
                                 <i class="bi bi-info-circle"></i>
                                 Ajoutez un widget <strong>FabLab Suite</strong> sur votre dashboard pour voir les informations en temps réel.
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="stFabBoard">
+                            <p class="text-muted mb-3">Configuration de FabBoard — le tableau de bord TV pour l'affichage des informations en temps réel.</p>
+                            <div class="settings-widget-row">
+                                <strong><i class="bi bi-tv"></i> URL de FabBoard</strong>
+                                <div class="input-group mt-2">
+                                    <input type="text" class="form-control" name="fabboard_url"
+                                           value="{{ settings.get('fabboard_url', 'http://localhost:5580') }}"
+                                           placeholder="http://192.168.1.x:5580">
+                                    <button class="btn btn-outline-secondary" type="button" id="testFabBoardBtn">
+                                        <i class="bi bi-check-circle"></i> Tester
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">URL de votre instance FabBoard (généralement port 5580)</small>
+                            </div>
+                            <div class="settings-widget-row">
+                                <strong><i class="bi bi-grid-3x3-gap"></i> Widget par défaut</strong>
+                                <select class="form-select mt-2" name="fabboard_default_widget">
+                                    {% set default_widget = settings.get('fabboard_default_widget', 'missions') %}
+                                    <option value="missions" {% if default_widget=='missions' %}selected{% endif %}>Missions Fabtrack</option>
+                                    <option value="horloge" {% if default_widget=='horloge' %}selected{% endif %}>Horloge</option>
+                                    <option value="machines" {% if default_widget=='machines' %}selected{% endif %}>État des machines</option>
+                                    <option value="fabtrack_conso" {% if default_widget=='fabtrack_conso' %}selected{% endif %}>Consommations Fabtrack</option>
+                                </select>
+                                <small class="form-text text-muted">Widget à afficher par défaut lors de l'ajout d'un raccourci FabBoard</small>
+                            </div>
+                            <div class="settings-widget-row">
+                                <strong><i class="bi bi-plus-square"></i> Actions rapides</strong>
+                                <div class="d-grid gap-2 mt-2">
+                                    <button type="button" class="btn btn-outline-primary" id="addFabBoardShortcut">
+                                        <i class="bi bi-bookmark-plus"></i> Ajouter un raccourci FabBoard au dashboard
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="openFabBoardFullscreen">
+                                        <i class="bi bi-arrows-fullscreen"></i> Ouvrir FabBoard en plein écran
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">Créer rapidement un accès à FabBoard depuis FabHome</small>
+                            </div>
+                            <div class="alert alert-warning mt-3 small">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Note :</strong> FabBoard doit être démarré et accessible à l'URL configurée pour que la fonctionnalité soit disponible.
                             </div>
                         </div>
                         <div class="tab-pane fade" id="stData">

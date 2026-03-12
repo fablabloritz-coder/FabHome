@@ -47,6 +47,25 @@ def _fetch_widget_data(base_url, endpoint):
     return json.loads(resp.read().decode('utf-8'))
 
 
+def _browser_safe_url(base_url):
+    """URL utilisable dans un navigateur local (Windows/Linux/Mac)."""
+    return (base_url or '').replace('host.docker.internal', 'localhost')
+
+
+def _check_health_endpoint(base_url, endpoint):
+    """Teste un endpoint health JSON et retourne (ok, payload)."""
+    url = base_url.rstrip('/') + endpoint
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = Request(url, headers={'Accept': 'application/json'})
+    resp = urlopen(req, timeout=4, context=ctx)
+    payload = json.loads(resp.read().decode('utf-8'))
+    status = str(payload.get('status', '')).lower()
+    ok = status in ('ok', 'healthy', 'up')
+    return ok, payload
+
+
 @bp.route('/api/suite/apps')
 def api_suite_list():
     """Liste toutes les apps FabLab Suite enregistrées."""
@@ -171,3 +190,45 @@ def api_suite_dashboard():
                 })
         dashboard.append(app_data)
     return jsonify(dashboard)
+
+
+@bp.route('/api/suite/test-url', methods=['POST'])
+def api_suite_test_url():
+    """Teste l'accessibilité d'une URL d'app FabLab Suite côté backend (anti-CORS)."""
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
+        return jsonify(error='URL requise'), 400
+    if not url.startswith(('http://', 'https://')):
+        url = 'http://' + url
+
+    checks = [
+        ('/api/fabsuite/health', 'fabsuite'),
+        ('/api/health', 'generic'),
+    ]
+    last_error = None
+
+    for endpoint, mode in checks:
+        try:
+            ok, payload = _check_health_endpoint(url, endpoint)
+            if ok:
+                return jsonify({
+                    'ok': True,
+                    'status': 'ok',
+                    'url': url,
+                    'browser_url': _browser_safe_url(url),
+                    'endpoint': endpoint,
+                    'mode': mode,
+                    'payload': payload,
+                })
+            last_error = f'Statut non OK via {endpoint}'
+        except Exception as exc:
+            last_error = str(exc)
+
+    return jsonify({
+        'ok': False,
+        'status': 'error',
+        'url': url,
+        'browser_url': _browser_safe_url(url),
+        'error': last_error or 'FabBoard non accessible',
+    }), 502
