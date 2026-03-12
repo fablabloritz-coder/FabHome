@@ -729,6 +729,13 @@ def delete_grid_widget(wid):
 
 # ── FabLab Suite Apps ────────────────────────────────────
 
+def _browser_url(url):
+    """Convertit host.docker.internal en localhost pour les liens navigateur."""
+    if url:
+        return url.replace('host.docker.internal', 'localhost')
+    return url
+
+
 def get_suite_apps():
     conn = get_db()
     rows = [dict(r) for r in conn.execute(
@@ -737,6 +744,7 @@ def get_suite_apps():
     for r in rows:
         r['capabilities'] = json.loads(r['capabilities'])
         r['widgets_json'] = json.loads(r['widgets_json'])
+        r['browser_url'] = _browser_url(r['url'])
     return rows
 
 
@@ -748,6 +756,7 @@ def get_suite_app(app_id):
         r = dict(row)
         r['capabilities'] = json.loads(r['capabilities'])
         r['widgets_json'] = json.loads(r['widgets_json'])
+        r['browser_url'] = _browser_url(r['url'])
         return r
     return None
 

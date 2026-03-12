@@ -244,12 +244,12 @@
                     </div>
                     <div class="gw-fabsuite-apps">
                         {% for sa in suite_apps %}
-                        <div class="suite-app-card" data-suite-app-id="{{ sa.id }}" data-url="{{ sa.url }}">
+                        <div class="suite-app-card" data-suite-app-id="{{ sa.id }}" data-url="{{ sa.browser_url }}">
                             <div class="suite-app-icon" style="background:{{ sa.color }}">
                                 <i class="bi {{ sa.icon }}"></i>
                             </div>
                             <div class="suite-app-info">
-                                <a href="{{ sa.url }}" target="_blank" class="suite-app-name">{{ sa.name }}</a>
+                                <a href="{{ sa.browser_url }}" target="_blank" class="suite-app-name">{{ sa.name }}</a>
                                 <span class="suite-app-desc">{{ sa.description }}</span>
                             </div>
                             <span class="suite-app-status suite-status-{{ sa.status }}" title="{{ sa.status }}"></span>
