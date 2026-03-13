@@ -76,6 +76,20 @@
     </div>
     {% endif %}
 
+    <!-- Notifications FabLab Suite -->
+    <div class="header-section header-notifications" id="suiteNotifications">
+        <button class="header-notif-btn" id="suiteNotifBtn" type="button" title="Notifications FabLab Suite">
+            <i class="bi bi-bell"></i>
+            <span class="header-notif-badge hidden" id="suiteNotifBadge">0</span>
+        </button>
+        <div class="header-notif-panel hidden" id="suiteNotifPanel">
+            <div class="header-notif-title">Alertes FabLab Suite</div>
+            <div class="header-notif-list" id="suiteNotifList">
+                <div class="header-notif-empty">Chargement…</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Recherche -->
     {% if widgets.get('search') and widgets.search.enabled %}
     <div class="header-section header-search">

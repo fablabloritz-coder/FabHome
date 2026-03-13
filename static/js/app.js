@@ -270,6 +270,103 @@
             });
         }).catch(function () {});
     }
+
+    function formatRelativeTime(dateValue) {
+        if (!dateValue) return '';
+        var dt = new Date(dateValue);
+        if (isNaN(dt.getTime())) return '';
+        var diffSec = Math.floor((Date.now() - dt.getTime()) / 1000);
+        if (diffSec < 60) return 'à l\'instant';
+        var diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return 'il y a ' + diffMin + ' min';
+        var diffHours = Math.floor(diffMin / 60);
+        if (diffHours < 24) return 'il y a ' + diffHours + ' h';
+        var diffDays = Math.floor(diffHours / 24);
+        return 'il y a ' + diffDays + ' j';
+    }
+
+    function renderSuiteNotifications(notifications) {
+        var badge = qs('#suiteNotifBadge');
+        var list = qs('#suiteNotifList');
+        if (!badge || !list) return;
+
+        var rows = Array.isArray(notifications) ? notifications : [];
+        var severityRank = { error: 0, warning: 1, info: 2 };
+        var sortedRows = rows.slice().sort(function (a, b) {
+            var typeA = String((a && a.type) || 'warning').toLowerCase();
+            var typeB = String((b && b.type) || 'warning').toLowerCase();
+            if (typeof severityRank[typeA] === 'undefined') typeA = 'warning';
+            if (typeof severityRank[typeB] === 'undefined') typeB = 'warning';
+            var rankDiff = severityRank[typeA] - severityRank[typeB];
+            if (rankDiff !== 0) return rankDiff;
+            var timeA = Date.parse(a && a.created_at ? a.created_at : '') || 0;
+            var timeB = Date.parse(b && b.created_at ? b.created_at : '') || 0;
+            return timeB - timeA;
+        });
+        var total = rows.length;
+        if (total > 0) {
+            badge.textContent = total > 99 ? '99+' : String(total);
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+
+        if (!total) {
+            list.innerHTML = '<div class="header-notif-empty">Aucune alerte active</div>';
+            return;
+        }
+
+        list.innerHTML = sortedRows.slice(0, 100).map(function (n) {
+            var typ = String(n.type || 'warning').toLowerCase();
+            if (['error', 'warning', 'info'].indexOf(typ) === -1) typ = 'warning';
+            var message = escHtml(String(n.message || 'Notification sans message'));
+            var source = escHtml(String(n.source_name || n.source_app || 'App'));
+            var createdAt = formatRelativeTime(n.created_at);
+            var timeHtml = createdAt ? '<span class="header-notif-time">' + escHtml(createdAt) + '</span>' : '';
+            return '<div class="header-notif-item type-' + typ + '">'
+                + '<div class="header-notif-row">'
+                + '<span class="header-notif-app">' + source + '</span>'
+                + timeHtml
+                + '</div>'
+                + '<div class="header-notif-message">' + message + '</div>'
+                + '</div>';
+        }).join('');
+    }
+
+    function loadSuiteNotifications() {
+        var list = qs('#suiteNotifList');
+        if (!list) return;
+        api('GET', '/api/suite/notifications')
+            .then(function (payload) {
+                renderSuiteNotifications(payload && payload.notifications ? payload.notifications : []);
+            })
+            .catch(function () {
+                list.innerHTML = '<div class="header-notif-empty">Notifications indisponibles</div>';
+            });
+    }
+
+    function initSuiteNotificationPanel() {
+        var root = qs('#suiteNotifications');
+        var btn = qs('#suiteNotifBtn');
+        var panel = qs('#suiteNotifPanel');
+        if (!root || !btn || !panel) return;
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            panel.classList.toggle('hidden');
+        });
+
+        panel.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+
+        document.addEventListener('click', function () {
+            panel.classList.add('hidden');
+        });
+
+        loadSuiteNotifications();
+        setInterval(loadSuiteNotifications, 60000);
+    }
     /* ══════════════════════════════════════
        MODE EDITION
        ══════════════════════════════════════ */
@@ -1594,6 +1691,8 @@
         loadSuiteDashboard();
         setInterval(loadSuiteDashboard, 120000); // 2 min
     }
+
+    initSuiteNotificationPanel();
 
     /* ══════════════════════════════════════
        INITIALISATION

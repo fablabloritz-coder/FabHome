@@ -47,6 +47,21 @@ def _fetch_widget_data(base_url, endpoint):
     return json.loads(resp.read().decode('utf-8'))
 
 
+def _extract_notifications(payload):
+    """Normalise le format des notifications retournées par les apps."""
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+    if isinstance(payload.get('notifications'), list):
+        return payload.get('notifications')
+    if isinstance(payload.get('items'), list):
+        return payload.get('items')
+    if isinstance(payload.get('data'), list):
+        return payload.get('data')
+    return []
+
+
 def _browser_safe_url(base_url):
     """URL utilisable dans un navigateur local (Windows/Linux/Mac)."""
     return (base_url or '').replace('host.docker.internal', 'localhost')
@@ -142,17 +157,21 @@ def api_suite_notifications():
     apps = models.get_suite_apps()
     all_notifs = []
     for a in apps:
-        if not a['enabled'] or not a.get('notifications_endpoint'):
+        if not a['enabled']:
             continue
+        endpoint = a.get('notifications_endpoint') or '/api/fabsuite/notifications'
         try:
-            data = _fetch_widget_data(a['url'], a['notifications_endpoint'])
-            for n in data.get('notifications', []):
+            data = _fetch_widget_data(a['url'], endpoint)
+            app_notifs = _extract_notifications(data)
+            app_notifs.sort(key=lambda n: n.get('created_at', ''), reverse=True)
+            # Évite qu'une app très bavarde masque les autres dans la topbar.
+            for n in app_notifs[:25]:
                 n['source_app'] = a['app_id']
                 n['source_name'] = a['name']
                 n['source_color'] = a['color']
                 all_notifs.append(n)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Notifications indisponibles pour %s (%s): %s", a.get('name'), a.get('url'), exc)
     all_notifs.sort(key=lambda n: n.get('created_at', ''), reverse=True)
     return jsonify({"notifications": all_notifs})
 

@@ -322,6 +322,135 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; marg
     font-size: 16px;
 }
 
+/* Notifications FabSuite dans header */
+.header-notifications {
+    position: relative;
+    margin-left: auto;
+}
+
+.header-notif-btn {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.92);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.header-notif-btn:hover {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,255,255,0.2);
+}
+
+.header-notif-btn i {
+    font-size: 16px;
+}
+
+.header-notif-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    padding: 0 5px;
+    border: 1px solid rgba(255,255,255,0.25);
+}
+
+.header-notif-panel {
+    position: absolute;
+    top: 42px;
+    right: 0;
+    width: min(420px, 92vw);
+    max-height: 360px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(18,18,18,0.97);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.45);
+    z-index: 1200;
+}
+
+.header-notif-title {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(255,255,255,0.9);
+}
+
+.header-notif-list {
+    max-height: 306px;
+    overflow-y: auto;
+}
+
+.header-notif-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.header-notif-item:last-child {
+    border-bottom: none;
+}
+
+.header-notif-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.header-notif-app {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(255,255,255,0.78);
+}
+
+.header-notif-time {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+}
+
+.header-notif-message {
+    font-size: 13px;
+    line-height: 1.35;
+    color: rgba(255,255,255,0.93);
+}
+
+.header-notif-item.type-error {
+    border-left: 3px solid #ef4444;
+}
+
+.header-notif-item.type-warning {
+    border-left: 3px solid #f59e0b;
+}
+
+.header-notif-item.type-info {
+    border-left: 3px solid #0ea5e9;
+}
+
+.header-notif-empty {
+    padding: 16px 12px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.65);
+    text-align: center;
+}
+
 /* Recherche dans header */
 .header-search {
     flex: 1;
@@ -1079,6 +1208,13 @@ body.edit-mode .group-card {
     }
 
     .header-search { max-width: none; order: 10; flex-basis: 100%; }
+    .header-notifications {
+        margin-left: 0;
+    }
+    .header-notif-panel {
+        right: -6px;
+        width: min(380px, 94vw);
+    }
     .header-logo span { display: none; }
 
     .main-container { flex-direction: column; }
